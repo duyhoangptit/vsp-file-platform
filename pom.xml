@@ -72,6 +72,19 @@
       <artifactId>okhttp</artifactId>
       <version>4.12.0</version>
     </dependency>
+    <!-- Spring Boot 4.x tách KafkaAutoConfiguration ra module riêng (spring-boot-kafka)
+         thay vì bundle chung trong spring-boot-autoconfigure — dùng starter để có cả
+         spring-kafka lẫn autoconfiguration, giống pattern liquibase/webmvc-test ở trên. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-kafka</artifactId>
+    </dependency>
+    <!-- Cùng lý do như spring-boot-starter-kafka ở trên: dùng starter để có luôn
+         spring-boot-data-redis (autoconfiguration), không chỉ spring-data-redis trần. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
@@ -107,6 +120,11 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-kafka</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

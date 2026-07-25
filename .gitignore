@@ -71,3 +71,5 @@ desktop.ini
 logs/
 .env
 .env.local
+/target/
+*.jar

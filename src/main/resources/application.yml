@@ -7,6 +7,29 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+  kafka:
+    bootstrap-servers: ${APP_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: ${spring.application.name}-job-worker
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.company.platform.job.messaging
+        spring.json.value.default.type: com.company.platform.job.messaging.JobMessage
+        spring.json.use.type.headers: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    listener:
+      ack-mode: manual
+  data:
+    redis:
+      host: ${APP_REDIS_HOST:redis}
+      port: ${APP_REDIS_PORT:6379}
+      password: ${APP_REDIS_PASSWORD:}
 
 app:
   minio:
@@ -16,3 +39,24 @@ app:
     connect-timeout-millis: ${APP_MINIO_CONNECT_TIMEOUT_MILLIS:10000}
     write-timeout-millis: ${APP_MINIO_WRITE_TIMEOUT_MILLIS:10000}
     read-timeout-millis: ${APP_MINIO_READ_TIMEOUT_MILLIS:10000}
+  job:
+    kafka:
+      topic: ${APP_JOB_KAFKA_TOPIC:job-events}
+    # Ngưỡng đặt trong mục 12 design doc là "chưa quyết định — để config, không hardcode";
+    # 2 JobType hiện tại cũng chỉ là placeholder (chưa có processor thật) nên số liệu dưới
+    # đây chỉ là giá trị mặc định tạm, chỉnh qua config khi có nghiệp vụ thật.
+    max-active-per-user: ${APP_JOB_MAX_ACTIVE_PER_USER:5}
+    rate-limit:
+      EXPORT_USER_CSV:
+        capacity: 10
+        refill-tokens: 10
+        refill-period: 1m
+      IMPORT_PRODUCT:
+        capacity: 5
+        refill-tokens: 5
+        refill-period: 1m
+
+# messaging.provider chọn adapter Kafka/Redis cho JobEventPublisher/Consumer (mục 6.2
+# design doc). Cố tình KHÔNG set ở đây (tắt mặc định) để không ảnh hưởng các test/context
+# full Spring context không cần Kafka — bật thật ở application-dev.yml hoặc qua env
+# MESSAGING_PROVIDER khi deploy.

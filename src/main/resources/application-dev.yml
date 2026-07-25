@@ -3,7 +3,15 @@ spring:
     url: jdbc:postgresql://localhost:5432/file_platform
     username: tigerpro
     password: secret
+  kafka:
+    bootstrap-servers: localhost:9094
+  data:
+    redis:
+      host: localhost
 
 app:
   minio:
     endpoint: http://localhost:9000
+
+messaging:
+  provider: kafka

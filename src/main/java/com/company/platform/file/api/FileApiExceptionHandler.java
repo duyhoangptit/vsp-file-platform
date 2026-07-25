@@ -37,7 +37,7 @@ public class FileApiExceptionHandler {
 
   @ExceptionHandler(FileVerificationFailedException.class)
   public ResponseEntity<ApiError> handleVerificationFailed(FileVerificationFailedException e) {
-    return error(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    return error(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
   }
 
   @ExceptionHandler(FileNotAvailableForDownloadException.class)
