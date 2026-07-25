@@ -7,3 +7,12 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+
+app:
+  minio:
+    endpoint: ${APP_MINIO_ENDPOINT:http://minio:9000}
+    access-key: ${APP_MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${APP_MINIO_SECRET_KEY:minioadmin123}
+    connect-timeout-millis: ${APP_MINIO_CONNECT_TIMEOUT_MILLIS:10000}
+    write-timeout-millis: ${APP_MINIO_WRITE_TIMEOUT_MILLIS:10000}
+    read-timeout-millis: ${APP_MINIO_READ_TIMEOUT_MILLIS:10000}

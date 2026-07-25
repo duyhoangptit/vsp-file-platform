@@ -3,3 +3,7 @@ spring:
     url: jdbc:postgresql://localhost:5432/file_platform
     username: tigerpro
     password: secret
+
+app:
+  minio:
+    endpoint: http://localhost:9000
