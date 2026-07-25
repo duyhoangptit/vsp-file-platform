@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-init-jobs.yaml
+  - include:
+      file: db/changelog/changes/002-init-file-categories.yaml
+  - include:
+      file: db/changelog/changes/003-init-file-assets.yaml
+  - include:
+      file: db/changelog/changes/004-init-audit-logs.yaml

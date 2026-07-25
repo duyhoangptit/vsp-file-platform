@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: file-platform
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
