@@ -39,6 +39,23 @@ spring:
       port: ${APP_REDIS_PORT:6379}
       password: ${APP_REDIS_PASSWORD:}
 
+# Service chạy trong internal network, không public ra ngoài (xem design doc) nên chỉ
+# chặn qua exposure whitelist, không thêm auth riêng cho Actuator ở tầng app.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+    env:
+      enabled: false
+    heapdump:
+      enabled: false
+    shutdown:
+      enabled: false
+
 app:
   minio:
     endpoint: ${APP_MINIO_ENDPOINT:http://minio:9000}

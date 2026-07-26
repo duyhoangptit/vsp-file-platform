@@ -1,9 +1,12 @@
 package com.company.platform.export.application;
 
+import com.company.platform.file.application.FileDownloadResult;
+import com.company.platform.file.application.FileDownloadService;
 import com.company.platform.job.application.JobSubmissionService;
 import com.company.platform.job.domain.Job;
 import com.company.platform.job.domain.JobNotFoundException;
 import com.company.platform.job.domain.JobRepository;
+import com.company.platform.job.domain.JobStatus;
 import com.company.platform.job.domain.JobType;
 import com.company.platform.shared.auth.AccessDeniedException;
 import com.company.platform.shared.auth.ResourceType;
@@ -26,14 +29,17 @@ public class ExportJobService {
   private final JobSubmissionService jobSubmissionService;
   private final JobRepository jobRepository;
   private final ObjectMapper objectMapper;
+  private final FileDownloadService fileDownloadService;
 
   public ExportJobService(
       JobSubmissionService jobSubmissionService,
       JobRepository jobRepository,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      FileDownloadService fileDownloadService) {
     this.jobSubmissionService = jobSubmissionService;
     this.jobRepository = jobRepository;
     this.objectMapper = objectMapper;
+    this.fileDownloadService = fileDownloadService;
   }
 
   public Job submitUserCsvExport(UserContext user, String idempotencyKey) {
@@ -45,7 +51,16 @@ public class ExportJobService {
         JobType.EXPORT_USER_CSV, emptyPayload, idempotencyKey, user.userId());
   }
 
-  public Job getJob(UUID jobId) {
-    return jobRepository.findById(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
+  public ExportJobDetail getJob(UUID jobId) {
+    Job job = jobRepository.findById(jobId).orElseThrow(() -> new JobNotFoundException(jobId));
+    String downloadUrl = null;
+    if (job.getStatus() == JobStatus.DONE) {
+      downloadUrl =
+          fileDownloadService
+              .findDownloadUrlByJobId(jobId)
+              .map(FileDownloadResult::downloadUrl)
+              .orElse(null);
+    }
+    return new ExportJobDetail(job, downloadUrl);
   }
 }

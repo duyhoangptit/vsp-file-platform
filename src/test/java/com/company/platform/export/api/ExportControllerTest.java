@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.company.platform.export.application.ExportJobDetail;
 import com.company.platform.export.application.ExportJobService;
 import com.company.platform.job.domain.Job;
 import com.company.platform.job.domain.JobNotFoundException;
@@ -89,7 +90,9 @@ class ExportControllerTest {
             any(), eq(ResourceType.JOB), any(), eq(Action.READ)))
         .thenReturn(true);
     when(exportJobService.getJob(jobId))
-        .thenReturn(new Job(jobId, JobType.EXPORT_USER_CSV, Map.of(), null, null, null, userId));
+        .thenReturn(
+            new ExportJobDetail(
+                new Job(jobId, JobType.EXPORT_USER_CSV, Map.of(), null, null, null, userId), null));
 
     mockMvc
         .perform(get("/exports/" + jobId).header("X-User-Id", userId.toString()))

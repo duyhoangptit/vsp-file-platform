@@ -50,6 +50,11 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
   long countByCreatedByAndStatusIn(UUID createdBy, Collection<JobStatus> statuses);
 
+  // Dùng cho gauge queue depth / pending-processing per job_type (JobQueueMetrics).
+  long countByStatus(JobStatus status);
+
+  long countByStatusAndJobType(JobStatus status, JobType jobType);
+
   Optional<Job> findByIdempotencyKey(String idempotencyKey);
 
   // Cheap EXISTS/count-short-circuit query dùng cho fallback poller (mục 6.2) — không load

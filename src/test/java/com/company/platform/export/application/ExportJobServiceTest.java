@@ -10,13 +10,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.company.platform.file.application.FileDownloadResult;
+import com.company.platform.file.application.FileDownloadService;
 import com.company.platform.job.application.JobSubmissionService;
 import com.company.platform.job.domain.Job;
 import com.company.platform.job.domain.JobNotFoundException;
 import com.company.platform.job.domain.JobRepository;
+import com.company.platform.job.domain.JobStatus;
 import com.company.platform.job.domain.JobType;
 import com.company.platform.shared.auth.AccessDeniedException;
 import com.company.platform.shared.auth.UserContext;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,8 +35,10 @@ class ExportJobServiceTest {
 
   private final JobSubmissionService jobSubmissionService = mock(JobSubmissionService.class);
   private final JobRepository jobRepository = mock(JobRepository.class);
+  private final FileDownloadService fileDownloadService = mock(FileDownloadService.class);
   private final ExportJobService exportJobService =
-      new ExportJobService(jobSubmissionService, jobRepository, new ObjectMapper());
+      new ExportJobService(
+          jobSubmissionService, jobRepository, new ObjectMapper(), fileDownloadService);
 
   @Test
   void should_throwAccessDeniedException_when_userIsNotAdmin() {
@@ -77,13 +83,31 @@ class ExportJobServiceTest {
   }
 
   @Test
-  void should_returnJob_when_jobExists() {
+  void should_returnJobWithNullDownloadUrl_when_jobExistsAndIsNotDone() {
     UUID jobId = UUID.randomUUID();
     Job job =
         new Job(jobId, JobType.EXPORT_USER_CSV, Map.of(), null, null, null, UUID.randomUUID());
     when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
-    assertThat(exportJobService.getJob(jobId)).isEqualTo(job);
+    ExportJobDetail result = exportJobService.getJob(jobId);
+
+    assertThat(result.job()).isEqualTo(job);
+    assertThat(result.downloadUrl()).isNull();
+    verify(fileDownloadService, never()).findDownloadUrlByJobId(any());
+  }
+
+  @Test
+  void should_returnDownloadUrl_when_jobIsDoneAndFileIsClean() {
+    UUID jobId = UUID.randomUUID();
+    Job doneJob = mock(Job.class);
+    when(doneJob.getStatus()).thenReturn(JobStatus.DONE);
+    when(jobRepository.findById(jobId)).thenReturn(Optional.of(doneJob));
+    when(fileDownloadService.findDownloadUrlByJobId(jobId))
+        .thenReturn(Optional.of(new FileDownloadResult("https://minio/presigned", Instant.now())));
+
+    ExportJobDetail result = exportJobService.getJob(jobId);
+
+    assertThat(result.downloadUrl()).isEqualTo("https://minio/presigned");
   }
 
   @Test

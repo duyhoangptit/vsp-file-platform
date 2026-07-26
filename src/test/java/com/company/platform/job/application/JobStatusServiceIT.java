@@ -11,6 +11,7 @@ import com.company.platform.job.domain.JobType;
 import com.company.platform.shared.audit.AuditLog;
 import com.company.platform.shared.audit.AuditLogRepository;
 import com.company.platform.shared.audit.AuditResult;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +41,7 @@ class JobStatusServiceIT {
   @Autowired private JobStatusService jobStatusService;
   @Autowired private JobRepository jobRepository;
   @Autowired private AuditLogRepository auditLogRepository;
+  @Autowired private MeterRegistry meterRegistry;
 
   private UUID seedPendingJob() {
     UUID jobId = UUID.randomUUID();
@@ -109,6 +111,30 @@ class JobStatusServiceIT {
   }
 
   @Test
+  void should_incrementDoneCounterAndRecordDuration_when_jobTransitionsToDone() {
+    UUID jobId = seedProcessingJob();
+    double doneBefore = counterCount("job.done", "EXPORT_USER_CSV");
+    long timerCountBefore = timerCount("job.processing.duration", "EXPORT_USER_CSV");
+
+    jobStatusService.markDone(jobId, "bucket/result.csv", 10);
+
+    assertThat(counterCount("job.done", "EXPORT_USER_CSV")).isEqualTo(doneBefore + 1);
+    assertThat(timerCount("job.processing.duration", "EXPORT_USER_CSV"))
+        .isEqualTo(timerCountBefore + 1);
+  }
+
+  @Test
+  void should_notIncrementDoneCounter_when_markDoneOnNonProcessingJob() {
+    UUID jobId = seedPendingJob();
+    double doneBefore = counterCount("job.done", "EXPORT_USER_CSV");
+
+    assertThatThrownBy(() -> jobStatusService.markDone(jobId, "bucket/result.csv", 10))
+        .isInstanceOf(InvalidJobStateException.class);
+
+    assertThat(counterCount("job.done", "EXPORT_USER_CSV")).isEqualTo(doneBefore);
+  }
+
+  @Test
   void should_transitionToFailed_when_jobIsProcessing() {
     UUID jobId = seedProcessingJob();
 
@@ -129,6 +155,27 @@ class JobStatusServiceIT {
     assertThatThrownBy(() -> jobStatusService.markFailed(jobId, "lỗi khi export"))
         .isInstanceOf(InvalidJobStateException.class);
     assertThat(auditLogsFor(jobId, "JOB_FAILED")).isEmpty();
+  }
+
+  @Test
+  void should_incrementFailedCounter_when_jobTransitionsToFailed() {
+    UUID jobId = seedProcessingJob();
+    double failedBefore = counterCount("job.failed", "EXPORT_USER_CSV");
+
+    jobStatusService.markFailed(jobId, "lỗi khi export");
+
+    assertThat(counterCount("job.failed", "EXPORT_USER_CSV")).isEqualTo(failedBefore + 1);
+  }
+
+  @Test
+  void should_notIncrementFailedCounter_when_markFailedOnNonProcessingJob() {
+    UUID jobId = seedPendingJob();
+    double failedBefore = counterCount("job.failed", "EXPORT_USER_CSV");
+
+    assertThatThrownBy(() -> jobStatusService.markFailed(jobId, "lỗi khi export"))
+        .isInstanceOf(InvalidJobStateException.class);
+
+    assertThat(counterCount("job.failed", "EXPORT_USER_CSV")).isEqualTo(failedBefore);
   }
 
   @Test
@@ -202,6 +249,16 @@ class JobStatusServiceIT {
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.SECONDS);
     }
+  }
+
+  private double counterCount(String name, String jobType) {
+    var counter = meterRegistry.find(name).tag("job_type", jobType).counter();
+    return counter != null ? counter.count() : 0.0;
+  }
+
+  private long timerCount(String name, String jobType) {
+    var timer = meterRegistry.find(name).tag("job_type", jobType).timer();
+    return timer != null ? timer.count() : 0L;
   }
 
   private List<AuditLog> auditLogsFor(UUID jobId, String action) {
