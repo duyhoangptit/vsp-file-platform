@@ -1,12 +1,14 @@
 package com.company.platform.file.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.minio.GetBucketLifecycleArgs;
 import io.minio.MinioClient;
 import io.minio.messages.LifecycleConfiguration;
 import io.minio.messages.Status;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -112,6 +114,37 @@ class MinioStorageServiceIT {
     } finally {
       Files.deleteIfExists(tempFile);
     }
+  }
+
+  @Test
+  void should_readBackSameBytes_when_usingGetObjectAfterUploadFile() throws Exception {
+    String bucketName = "import-" + UUID.randomUUID();
+    String objectKey = UUID.randomUUID().toString();
+    String content = "email,full_name,status,role\na@b.com,Alice,ACTIVE,MEMBER\n";
+    Path tempFile = Files.createTempFile("get-object-it-", ".csv");
+    Files.writeString(tempFile, content, StandardCharsets.UTF_8);
+
+    try {
+      minioStorageService.ensureBucketExists(bucketName, null);
+      minioStorageService.uploadFile(bucketName, objectKey, tempFile, "text/csv");
+
+      try (InputStream objectStream = minioStorageService.getObject(bucketName, objectKey)) {
+        String readBack = new String(objectStream.readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(readBack).isEqualTo(content);
+      }
+    } finally {
+      Files.deleteIfExists(tempFile);
+    }
+  }
+
+  @Test
+  void should_throwMinioStorageException_when_objectDoesNotExistOnGetObject() {
+    String bucketName = "empty-" + UUID.randomUUID();
+    String objectKey = UUID.randomUUID().toString();
+    minioStorageService.ensureBucketExists(bucketName, null);
+
+    assertThatThrownBy(() -> minioStorageService.getObject(bucketName, objectKey))
+        .isInstanceOf(MinioStorageException.class);
   }
 
   @Test

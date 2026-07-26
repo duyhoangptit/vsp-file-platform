@@ -2,13 +2,9 @@ package com.company.platform.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.company.platform.shared.audit.AuditLogService;
-import com.company.platform.shared.audit.AuditResult;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -17,23 +13,19 @@ import org.junit.jupiter.api.Test;
 
 class DefaultResourceAuthorizationServiceTest {
 
-  private final AuditLogService auditLogService = mock(AuditLogService.class);
-
   @Test
   void should_allowAccess_when_userIsTheOwner() {
     UUID userId = UUID.randomUUID();
     UUID resourceId = UUID.randomUUID();
     ResourceOwnerLookup lookup = fixedLookup(ResourceType.FILE_ASSET, Optional.of(userId));
     DefaultResourceAuthorizationService service =
-        new DefaultResourceAuthorizationService(List.of(lookup), auditLogService);
+        new DefaultResourceAuthorizationService(List.of(lookup));
     UserContext user = new UserContext(userId, Set.of());
 
     boolean allowed =
         service.canAccess(user, ResourceType.FILE_ASSET, resourceId.toString(), Action.WRITE);
 
     assertThat(allowed).isTrue();
-    verify(auditLogService)
-        .record(eq(userId), eq("WRITE"), eq("FILE_ASSET"), eq(resourceId), eq(AuditResult.SUCCESS));
   }
 
   @Test
@@ -43,15 +35,13 @@ class DefaultResourceAuthorizationServiceTest {
     UUID resourceId = UUID.randomUUID();
     ResourceOwnerLookup lookup = fixedLookup(ResourceType.FILE_ASSET, Optional.of(ownerId));
     DefaultResourceAuthorizationService service =
-        new DefaultResourceAuthorizationService(List.of(lookup), auditLogService);
+        new DefaultResourceAuthorizationService(List.of(lookup));
     UserContext user = new UserContext(userId, Set.of());
 
     boolean allowed =
         service.canAccess(user, ResourceType.FILE_ASSET, resourceId.toString(), Action.WRITE);
 
     assertThat(allowed).isFalse();
-    verify(auditLogService)
-        .record(eq(userId), eq("WRITE"), eq("FILE_ASSET"), eq(resourceId), eq(AuditResult.DENIED));
   }
 
   @Test
@@ -61,7 +51,7 @@ class DefaultResourceAuthorizationServiceTest {
     UUID resourceId = UUID.randomUUID();
     ResourceOwnerLookup lookup = fixedLookup(ResourceType.FILE_ASSET, Optional.of(ownerId));
     DefaultResourceAuthorizationService service =
-        new DefaultResourceAuthorizationService(List.of(lookup), auditLogService);
+        new DefaultResourceAuthorizationService(List.of(lookup));
     UserContext admin = new UserContext(userId, Set.of("ADMIN"));
 
     boolean allowed =
@@ -76,7 +66,7 @@ class DefaultResourceAuthorizationServiceTest {
     UUID resourceId = UUID.randomUUID();
     ResourceOwnerLookup lookup = fixedLookup(ResourceType.FILE_ASSET, Optional.empty());
     DefaultResourceAuthorizationService service =
-        new DefaultResourceAuthorizationService(List.of(lookup), auditLogService);
+        new DefaultResourceAuthorizationService(List.of(lookup));
     UserContext user = new UserContext(userId, Set.of());
 
     boolean allowed =
@@ -89,7 +79,7 @@ class DefaultResourceAuthorizationServiceTest {
   void should_denyAccess_when_noLookupRegisteredForResourceType() {
     UUID userId = UUID.randomUUID();
     DefaultResourceAuthorizationService service =
-        new DefaultResourceAuthorizationService(List.of(), auditLogService);
+        new DefaultResourceAuthorizationService(List.of());
     UserContext user = new UserContext(userId, Set.of());
 
     boolean allowed =

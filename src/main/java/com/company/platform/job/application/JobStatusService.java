@@ -3,9 +3,8 @@ package com.company.platform.job.application;
 import com.company.platform.job.domain.InvalidJobStateException;
 import com.company.platform.job.domain.JobRepository;
 import com.company.platform.job.domain.JobStatus;
-import com.company.platform.shared.audit.AuditLogService;
 import com.company.platform.shared.audit.AuditResult;
-import com.company.platform.shared.auth.ResourceType;
+import com.company.platform.shared.audit.Audited;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -15,23 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobStatusService {
 
   private final JobRepository jobRepository;
-  private final AuditLogService auditLogService;
 
-  public JobStatusService(JobRepository jobRepository, AuditLogService auditLogService) {
+  public JobStatusService(JobRepository jobRepository) {
     this.jobRepository = jobRepository;
-    this.auditLogService = auditLogService;
   }
 
+  @Audited(action = "JOB_PROCESSING_STARTED", resourceType = "JOB", result = AuditResult.SUCCESS)
   @Transactional
   public boolean tryMarkProcessing(UUID jobId) {
-    boolean success =
-        jobRepository.casUpdateStatus(jobId, JobStatus.PENDING, JobStatus.PROCESSING, Instant.now())
-            == 1;
-    if (success) {
-      auditLogService.record(
-          null, "JOB_PROCESSING_STARTED", ResourceType.JOB.name(), jobId, AuditResult.SUCCESS);
-    }
-    return success;
+    return jobRepository.casUpdateStatus(
+            jobId, JobStatus.PENDING, JobStatus.PROCESSING, Instant.now())
+        == 1;
   }
 
   @Transactional
@@ -46,6 +39,7 @@ public class JobStatusService {
     jobRepository.updateProgress(jobId, JobStatus.PROCESSING, processedUnits, Instant.now());
   }
 
+  @Audited(action = "JOB_DONE", resourceType = "JOB", result = AuditResult.SUCCESS)
   @Transactional
   public void markDone(UUID jobId, String resultLocation, long processedUnits) {
     int updated =
@@ -59,9 +53,9 @@ public class JobStatusService {
     if (updated != 1) {
       throw new InvalidJobStateException(jobId, JobStatus.PROCESSING);
     }
-    auditLogService.record(null, "JOB_DONE", ResourceType.JOB.name(), jobId, AuditResult.SUCCESS);
   }
 
+  @Audited(action = "JOB_FAILED", resourceType = "JOB", result = AuditResult.FAILED)
   @Transactional
   public void markFailed(UUID jobId, String errorMessage) {
     int updated =
@@ -70,6 +64,5 @@ public class JobStatusService {
     if (updated != 1) {
       throw new InvalidJobStateException(jobId, JobStatus.PROCESSING);
     }
-    auditLogService.record(null, "JOB_FAILED", ResourceType.JOB.name(), jobId, AuditResult.FAILED);
   }
 }

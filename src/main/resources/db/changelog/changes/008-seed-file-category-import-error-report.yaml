@@ -1,0 +1,14 @@
+databaseChangeLog:
+  # IMPORT_ERROR_REPORT là category thật mà ImportUserProcessor cần để upload báo cáo dòng lỗi khi
+  # import CSV có dòng không hợp lệ (chiến lược: skip dòng lỗi, tiếp tục các dòng còn lại, job vẫn
+  # DONE) — cùng nhóm với 006/007. File nhỏ (chỉ liệt kê row_number + reason) nên max_size_bytes
+  # thấp hơn EXPORT_RESULT/IMPORT_RAW; retention dài hơn (30 ngày) vì có giá trị tra cứu sau khi
+  # người dùng sửa lại file nguồn.
+  - changeSet:
+      id: 008-1-seed-file-category-import-error-report
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO file_categories (code, bucket_name, allowed_mime_types, max_size_bytes, require_virus_scan, is_public, retention_days)
+              VALUES ('IMPORT_ERROR_REPORT', 'import-error-reports', '["text/csv"]'::jsonb, 10485760, false, false, 30);

@@ -1,6 +1,7 @@
 package com.company.platform.file.storage;
 
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.Http.Method;
 import io.minio.MakeBucketArgs;
@@ -14,6 +15,7 @@ import io.minio.errors.MinioException;
 import io.minio.messages.Filter;
 import io.minio.messages.LifecycleConfiguration;
 import io.minio.messages.Status;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -92,6 +94,21 @@ public class MinioStorageService {
     } catch (MinioException e) {
       throw new MinioStorageException(
           "Không thể upload file %s lên %s/%s".formatted(localFile, bucketName, objectKey), e);
+    }
+  }
+
+  /**
+   * Đọc trực tiếp nội dung object từ server (khác presigned GET dành cho browser/HTTP client) —
+   * dùng cho worker nền cần tự parse nội dung file (VD ImportUserProcessor đọc CSV), không redirect
+   * qua URL. Caller chịu trách nhiệm close() InputStream trả về.
+   */
+  public InputStream getObject(String bucketName, String objectKey) {
+    try {
+      return minioClient.getObject(
+          GetObjectArgs.builder().bucket(bucketName).object(objectKey).build());
+    } catch (MinioException e) {
+      throw new MinioStorageException(
+          "Không thể đọc object %s/%s".formatted(bucketName, objectKey), e);
     }
   }
 

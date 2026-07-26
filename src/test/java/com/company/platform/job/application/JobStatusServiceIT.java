@@ -8,6 +8,9 @@ import com.company.platform.job.domain.Job;
 import com.company.platform.job.domain.JobRepository;
 import com.company.platform.job.domain.JobStatus;
 import com.company.platform.job.domain.JobType;
+import com.company.platform.shared.audit.AuditLog;
+import com.company.platform.shared.audit.AuditLogRepository;
+import com.company.platform.shared.audit.AuditResult;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,6 +39,7 @@ class JobStatusServiceIT {
 
   @Autowired private JobStatusService jobStatusService;
   @Autowired private JobRepository jobRepository;
+  @Autowired private AuditLogRepository auditLogRepository;
 
   private UUID seedPendingJob() {
     UUID jobId = UUID.randomUUID();
@@ -66,6 +70,9 @@ class JobStatusServiceIT {
     assertThat(success).isTrue();
     assertThat(jobRepository.findById(jobId).orElseThrow().getStatus())
         .isEqualTo(JobStatus.PROCESSING);
+    assertThat(auditLogsFor(jobId, "JOB_PROCESSING_STARTED"))
+        .singleElement()
+        .satisfies(log -> assertThat(log.getResult()).isEqualTo(AuditResult.SUCCESS));
   }
 
   @Test
@@ -87,6 +94,9 @@ class JobStatusServiceIT {
     assertThat(job.getStatus()).isEqualTo(JobStatus.DONE);
     assertThat(job.getResultLocation()).isEqualTo("bucket/result.csv");
     assertThat(job.getProcessedUnits()).isEqualTo(10);
+    assertThat(auditLogsFor(jobId, "JOB_DONE"))
+        .singleElement()
+        .satisfies(log -> assertThat(log.getResult()).isEqualTo(AuditResult.SUCCESS));
   }
 
   @Test
@@ -95,6 +105,7 @@ class JobStatusServiceIT {
 
     assertThatThrownBy(() -> jobStatusService.markDone(jobId, "bucket/result.csv", 10))
         .isInstanceOf(InvalidJobStateException.class);
+    assertThat(auditLogsFor(jobId, "JOB_DONE")).isEmpty();
   }
 
   @Test
@@ -106,6 +117,9 @@ class JobStatusServiceIT {
     Job job = jobRepository.findById(jobId).orElseThrow();
     assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
     assertThat(job.getErrorMessage()).isEqualTo("lỗi khi export");
+    assertThat(auditLogsFor(jobId, "JOB_FAILED"))
+        .singleElement()
+        .satisfies(log -> assertThat(log.getResult()).isEqualTo(AuditResult.FAILED));
   }
 
   @Test
@@ -114,6 +128,7 @@ class JobStatusServiceIT {
 
     assertThatThrownBy(() -> jobStatusService.markFailed(jobId, "lỗi khi export"))
         .isInstanceOf(InvalidJobStateException.class);
+    assertThat(auditLogsFor(jobId, "JOB_FAILED")).isEmpty();
   }
 
   @Test
@@ -182,10 +197,17 @@ class JobStatusServiceIT {
       assertThat(processedByWorkerCount.get()).isEqualTo(1);
       assertThat(jobRepository.findById(jobId).orElseThrow().getStatus())
           .isEqualTo(JobStatus.PROCESSING);
+      assertThat(auditLogsFor(jobId, "JOB_PROCESSING_STARTED")).hasSize(1);
     } finally {
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.SECONDS);
     }
+  }
+
+  private List<AuditLog> auditLogsFor(UUID jobId, String action) {
+    return auditLogRepository.findByResourceId(jobId).stream()
+        .filter(log -> log.getAction().equals(action))
+        .toList();
   }
 
   private boolean getUnchecked(Future<Boolean> future) {

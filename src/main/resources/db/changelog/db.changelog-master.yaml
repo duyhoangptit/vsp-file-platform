@@ -11,3 +11,7 @@ databaseChangeLog:
       file: db/changelog/changes/005-init-app-users.yaml
   - include:
       file: db/changelog/changes/006-seed-file-category-export-result.yaml
+  - include:
+      file: db/changelog/changes/007-seed-file-category-import-raw.yaml
+  - include:
+      file: db/changelog/changes/008-seed-file-category-import-error-report.yaml

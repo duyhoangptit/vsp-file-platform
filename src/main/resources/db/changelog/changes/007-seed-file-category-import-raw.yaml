@@ -1,0 +1,11 @@
+databaseChangeLog:
+  # IMPORT_RAW là category thật mà ImportUserProcessor (Phase 6) cần để hoạt động, không phải dữ
+  # liệu demo — cùng nhóm với 006-seed-file-category-export-result.yaml.
+  - changeSet:
+      id: 007-1-seed-file-category-import-raw
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO file_categories (code, bucket_name, allowed_mime_types, max_size_bytes, require_virus_scan, is_public, retention_days)
+              VALUES ('IMPORT_RAW', 'import-raw', '["text/csv"]'::jsonb, 52428800, false, false, 7);

@@ -73,9 +73,16 @@ app:
         capacity: 5
         refill-tokens: 5
         refill-period: 1m
+      IMPORT_USER:
+        capacity: 5
+        refill-tokens: 5
+        refill-period: 1m
   export:
     user-csv:
       page-size: ${APP_EXPORT_USER_CSV_PAGE_SIZE:500}
+  import:
+    user-csv:
+      batch-size: ${APP_IMPORT_USER_CSV_BATCH_SIZE:500}
   cleanup:
     # Mục 10/12 design doc: Retention & Cleanup, ngưỡng "chưa quyết định — để config"; giá trị
     # dưới đây chỉ là mặc định tạm.
