@@ -39,6 +39,13 @@ public class JobStatusService {
     jobRepository.casUpdateHeartbeat(jobId, JobStatus.PROCESSING, Instant.now());
   }
 
+  // Best-effort: không throw nếu job không còn PROCESSING (VD vừa bị markFailed) — đây chỉ là
+  // chỉ số tiến độ hiển thị cho UI (mục 11 design doc), không phải state transition bắt buộc.
+  @Transactional
+  public void updateProgress(UUID jobId, long processedUnits) {
+    jobRepository.updateProgress(jobId, JobStatus.PROCESSING, processedUnits, Instant.now());
+  }
+
   @Transactional
   public void markDone(UUID jobId, String resultLocation, long processedUnits) {
     int updated =

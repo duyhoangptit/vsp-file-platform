@@ -101,7 +101,8 @@ class FileUploadControllerTest {
                 1024,
                 "USER",
                 userId,
-                userId));
+                userId,
+                null));
 
     mockMvc
         .perform(

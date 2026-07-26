@@ -4,4 +4,25 @@ import com.company.platform.job.domain.JobType;
 import java.util.Map;
 import java.util.UUID;
 
-public record JobContext(UUID jobId, JobType jobType, Map<String, Object> payload) {}
+public record JobContext(
+    UUID jobId, JobType jobType, Map<String, Object> payload, ProgressReporter progressReporter) {
+
+  // Constructor tiện dùng cho nơi tạo JobContext gốc (JobScheduler) — chưa biết gì về progress
+  // reporting. AbstractJobProcessor tự bọc lại context với 1 ProgressReporter thật (ghi
+  // jobs.processed_units) trước khi truyền cho validate()/doExecute(), nên business processor
+  // gọi context.updateProgress(count) là ghi thật xuống DB; còn nơi nào dựng JobContext trực
+  // tiếp (test gọi thẳng doExecute()) thì updateProgress() chỉ no-op.
+  public JobContext(UUID jobId, JobType jobType, Map<String, Object> payload) {
+    this(jobId, jobType, payload, processedUnits -> {});
+  }
+
+  /** Business processor gọi định kỳ theo batch trong lúc doExecute() chạy (mục 11 design doc). */
+  public void updateProgress(long processedUnits) {
+    progressReporter.report(processedUnits);
+  }
+
+  @FunctionalInterface
+  public interface ProgressReporter {
+    void report(long processedUnits);
+  }
+}

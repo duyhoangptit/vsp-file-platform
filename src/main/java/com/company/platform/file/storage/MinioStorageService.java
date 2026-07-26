@@ -5,13 +5,19 @@ import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.Http.Method;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
+import io.minio.SetBucketLifecycleArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.UploadObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
+import io.minio.messages.Filter;
+import io.minio.messages.LifecycleConfiguration;
+import io.minio.messages.Status;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
@@ -24,16 +30,42 @@ public class MinioStorageService {
     this.minioClient = minioClient;
   }
 
-  public void ensureBucketExists(String bucketName) {
+  // Lifecycle rule chỉ được set khi bucket vừa tạo mới (mục 10 design doc) — nếu category đổi
+  // retention_days sau khi bucket đã tồn tại, rule cũ trên bucket đó không tự cập nhật lại.
+  public void ensureBucketExists(String bucketName, Integer retentionDays) {
     try {
       boolean exists =
           minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
       if (!exists) {
         minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
+        applyRetentionLifecycle(bucketName, retentionDays);
       }
     } catch (MinioException e) {
       throw new MinioStorageException("Không thể tạo/kiểm tra bucket: " + bucketName, e);
     }
+  }
+
+  // retentionDays null = giữ file vĩnh viễn, không set lifecycle rule.
+  private void applyRetentionLifecycle(String bucketName, Integer retentionDays)
+      throws MinioException {
+    if (retentionDays == null) {
+      return;
+    }
+    LifecycleConfiguration.Rule rule =
+        new LifecycleConfiguration.Rule(
+            Status.ENABLED,
+            null,
+            new LifecycleConfiguration.Expiration((ZonedDateTime) null, retentionDays, null, null),
+            new Filter(""),
+            "retention-policy",
+            null,
+            null,
+            null);
+    minioClient.setBucketLifecycle(
+        SetBucketLifecycleArgs.builder()
+            .bucket(bucketName)
+            .config(new LifecycleConfiguration(List.of(rule)))
+            .build());
   }
 
   public String generatePresignedPutUrl(String bucketName, String objectKey, Duration expiry) {

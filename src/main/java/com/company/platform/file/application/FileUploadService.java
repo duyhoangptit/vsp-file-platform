@@ -49,7 +49,7 @@ public class FileUploadService {
 
     validate(category, command);
 
-    minioStorageService.ensureBucketExists(category.getBucketName());
+    minioStorageService.ensureBucketExists(category.getBucketName(), category.getRetentionDays());
 
     UUID fileAssetId = UUID.randomUUID();
     String objectKey = UUID.randomUUID().toString();
@@ -65,7 +65,8 @@ public class FileUploadService {
             command.sizeBytes(),
             command.ownerType(),
             command.ownerId(),
-            command.uploadedBy());
+            command.uploadedBy(),
+            computeExpiresAt(category));
     fileAssetRepository.save(fileAsset);
 
     String uploadUrl =
@@ -137,7 +138,7 @@ public class FileUploadService {
             .findById(command.categoryCode())
             .orElseThrow(() -> new FileCategoryNotFoundException(command.categoryCode()));
 
-    minioStorageService.ensureBucketExists(category.getBucketName());
+    minioStorageService.ensureBucketExists(category.getBucketName(), category.getRetentionDays());
 
     UUID fileAssetId = UUID.randomUUID();
     String objectKey = UUID.randomUUID().toString();
@@ -155,7 +156,8 @@ public class FileUploadService {
             command.ownerType(),
             command.ownerId(),
             command.uploadedBy(),
-            command.jobId());
+            command.jobId(),
+            computeExpiresAt(category));
     fileAssetRepository.save(fileAsset);
 
     minioStorageService.uploadFile(
@@ -184,6 +186,13 @@ public class FileUploadService {
     return fileAssetRepository
         .findById(fileAssetId)
         .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+  }
+
+  // retentionDays null = giữ file vĩnh viễn, không set expiresAt (mục 10 design doc) — cùng
+  // nguồn retentionDays đã dùng để set MinIO bucket lifecycle rule (MinioStorageService).
+  private Instant computeExpiresAt(FileCategory category) {
+    Integer retentionDays = category.getRetentionDays();
+    return retentionDays == null ? null : Instant.now().plus(Duration.ofDays(retentionDays));
   }
 
   private long fileSize(Path localFile) {

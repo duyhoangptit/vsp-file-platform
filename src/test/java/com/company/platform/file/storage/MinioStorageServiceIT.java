@@ -2,7 +2,10 @@ package com.company.platform.file.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.minio.GetBucketLifecycleArgs;
 import io.minio.MinioClient;
+import io.minio.messages.LifecycleConfiguration;
+import io.minio.messages.Status;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -27,11 +30,12 @@ class MinioStorageServiceIT {
   @Container
   private static final MinIOContainer MINIO_CONTAINER = new MinIOContainer("minio/minio:latest");
 
+  private MinioClient minioClient;
   private MinioStorageService minioStorageService;
 
   @BeforeEach
   void setUp() {
-    MinioClient minioClient =
+    minioClient =
         MinioClient.builder()
             .endpoint(MINIO_CONTAINER.getS3URL())
             .credentials(MINIO_CONTAINER.getUserName(), MINIO_CONTAINER.getPassword())
@@ -43,8 +47,8 @@ class MinioStorageServiceIT {
   void should_createBucket_when_bucketDoesNotExistYet() {
     String bucketName = "test-bucket-" + UUID.randomUUID();
 
-    minioStorageService.ensureBucketExists(bucketName);
-    minioStorageService.ensureBucketExists(bucketName);
+    minioStorageService.ensureBucketExists(bucketName, null);
+    minioStorageService.ensureBucketExists(bucketName, null);
 
     String objectKey = UUID.randomUUID().toString();
     String getUrl =
@@ -58,7 +62,7 @@ class MinioStorageServiceIT {
     String objectKey = UUID.randomUUID().toString();
     String content = "hello minio " + UUID.randomUUID();
 
-    minioStorageService.ensureBucketExists(bucketName);
+    minioStorageService.ensureBucketExists(bucketName, null);
 
     String putUrl =
         minioStorageService.generatePresignedPutUrl(bucketName, objectKey, Duration.ofMinutes(5));
@@ -92,7 +96,7 @@ class MinioStorageServiceIT {
     Files.writeString(tempFile, content, StandardCharsets.UTF_8);
 
     try {
-      minioStorageService.ensureBucketExists(bucketName);
+      minioStorageService.ensureBucketExists(bucketName, null);
       minioStorageService.uploadFile(bucketName, objectKey, tempFile, "text/csv");
 
       String getUrl =
@@ -114,7 +118,7 @@ class MinioStorageServiceIT {
   void should_throwMinioStorageException_when_objectDoesNotExistOnDownload() throws IOException {
     String bucketName = "empty-" + UUID.randomUUID();
     String objectKey = UUID.randomUUID().toString();
-    minioStorageService.ensureBucketExists(bucketName);
+    minioStorageService.ensureBucketExists(bucketName, null);
 
     String getUrl =
         minioStorageService.generatePresignedGetUrl(bucketName, objectKey, Duration.ofMinutes(5));
@@ -131,5 +135,32 @@ class MinioStorageServiceIT {
     }
 
     assertThat(response.statusCode()).isEqualTo(404);
+  }
+
+  @Test
+  void should_setLifecycleExpirationRule_when_retentionDaysProvided() throws Exception {
+    String bucketName = "retention-" + UUID.randomUUID();
+
+    minioStorageService.ensureBucketExists(bucketName, 7);
+
+    LifecycleConfiguration lifecycle =
+        minioClient.getBucketLifecycle(GetBucketLifecycleArgs.builder().bucket(bucketName).build());
+    assertThat(lifecycle.rules()).hasSize(1);
+    LifecycleConfiguration.Rule rule = lifecycle.rules().get(0);
+    assertThat(rule.status()).isEqualTo(Status.ENABLED);
+    assertThat(rule.expiration().days()).isEqualTo(7);
+  }
+
+  @Test
+  void should_notSetLifecycleRule_when_retentionDaysIsNull() throws Exception {
+    String bucketName = "no-retention-" + UUID.randomUUID();
+
+    minioStorageService.ensureBucketExists(bucketName, null);
+
+    // MinioClient.getBucketLifecycle trả null (không ném exception) khi bucket chưa có
+    // lifecycle config — SDK tự nuốt lỗi "NoSuchLifecycleConfiguration" từ server.
+    LifecycleConfiguration lifecycle =
+        minioClient.getBucketLifecycle(GetBucketLifecycleArgs.builder().bucket(bucketName).build());
+    assertThat(lifecycle).isNull();
   }
 }

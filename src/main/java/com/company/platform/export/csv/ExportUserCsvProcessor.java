@@ -80,7 +80,7 @@ public class ExportUserCsvProcessor extends AbstractJobProcessor {
 
     Path tempFile = createTempFile(context.jobId());
     try {
-      WriteResult writeResult = writeCsv(tempFile);
+      WriteResult writeResult = writeCsv(context, tempFile);
       FileAsset fileAsset = uploadResult(job, tempFile, writeResult.checksumSha256());
       return new JobResult(fileAsset.getObjectKey(), writeResult.processedUnits());
     } finally {
@@ -92,7 +92,7 @@ public class ExportUserCsvProcessor extends AbstractJobProcessor {
 
   // Ghi CSV và tính SHA-256 trong cùng 1 lượt đọc file (DigestOutputStream bọc thẳng
   // OutputStream đích của RecordWriter) thay vì ghi xong rồi đọc lại cả file 1 lần nữa.
-  private WriteResult writeCsv(Path tempFile) {
+  private WriteResult writeCsv(JobContext context, Path tempFile) {
     DataReader<AppUser> dataReader = kitFactory.createDataReader();
     long processedUnits = 0;
     String cursor = null;
@@ -111,6 +111,9 @@ public class ExportUserCsvProcessor extends AbstractJobProcessor {
           processedUnits++;
         }
         cursor = content.get(content.size() - 1).getId().toString();
+        // Báo tiến độ theo batch (1 lần/trang), không phải từng record — tránh spam UPDATE
+        // xuống DB (mục 11 design doc).
+        context.updateProgress(processedUnits);
       }
     } catch (IOException e) {
       throw new ExportProcessingException("Không ghi được file CSV tạm " + tempFile, e);

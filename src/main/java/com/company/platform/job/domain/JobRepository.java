@@ -98,4 +98,35 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
       @Param("id") UUID id,
       @Param("expectedStatus") JobStatus expectedStatus,
       @Param("heartbeatAt") Instant heartbeatAt);
+
+  // UPDATE nhẹ (chỉ processed_units + updated_at), KHÔNG phải full entity save — business
+  // processor gọi định kỳ theo batch qua JobContext.updateProgress() trong lúc doExecute() chạy
+  // (mục 11 design doc). Guard WHERE status = PROCESSING cùng tinh thần casUpdateHeartbeat: nếu
+  // job không còn PROCESSING (race hiếm với reconciler/markFailed), im lặng bỏ qua thay vì ném
+  // lỗi — đây chỉ là chỉ số tiến độ hiển thị cho UI, không phải bất biến trạng thái bắt buộc.
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "UPDATE Job j SET j.processedUnits = :processedUnits, j.updatedAt = :now "
+          + "WHERE j.id = :id AND j.status = :expectedStatus")
+  int updateProgress(
+      @Param("id") UUID id,
+      @Param("expectedStatus") JobStatus expectedStatus,
+      @Param("processedUnits") long processedUnits,
+      @Param("now") Instant now);
+
+  // Native SQL vì cần LIMIT trong subquery (JPQL không hỗ trợ) — chỉ xử lý tối đa batchSize
+  // dòng/lần gọi (mục 4 design doc: DONE -> EXPIRED do retention job dọn dẹp). Lọc theo status
+  // trước rồi created_at, tận dụng phần đầu của index (status, priority DESC, created_at ASC)
+  // đã có cho JobScheduler.
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE jobs SET status = 'EXPIRED', updated_at = :now WHERE id IN ("
+              + "SELECT id FROM jobs WHERE status = 'DONE' AND created_at < :threshold "
+              + "ORDER BY id LIMIT :batchSize)",
+      nativeQuery = true)
+  int expireDoneBatch(
+      @Param("threshold") Instant threshold,
+      @Param("now") Instant now,
+      @Param("batchSize") int batchSize);
 }

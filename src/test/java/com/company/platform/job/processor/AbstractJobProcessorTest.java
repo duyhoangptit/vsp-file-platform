@@ -17,7 +17,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.TaskScheduler;
 
@@ -31,12 +31,12 @@ class AbstractJobProcessorTest {
   void should_notCallDoExecute_when_tryMarkProcessingLosesTheRace() {
     UUID jobId = UUID.randomUUID();
     when(jobStatusService.tryMarkProcessing(jobId)).thenReturn(false);
-    Supplier<JobResult> doExecute = mock(Supplier.class);
+    Function<JobContext, JobResult> doExecute = mock(Function.class);
     TestJobProcessor processor = new TestJobProcessor(() -> {}, doExecute);
 
     processor.process(new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of()));
 
-    verify(doExecute, never()).get();
+    verify(doExecute, never()).apply(any());
     verify(jobStatusService, never()).markDone(any(), any(), anyLong());
   }
 
@@ -46,7 +46,7 @@ class AbstractJobProcessorTest {
     stubHeartbeatScheduler();
     when(jobStatusService.tryMarkProcessing(jobId)).thenReturn(true);
     JobResult result = new JobResult("bucket/result.csv", 42);
-    TestJobProcessor processor = new TestJobProcessor(() -> {}, () -> result);
+    TestJobProcessor processor = new TestJobProcessor(() -> {}, context -> result);
 
     processor.process(new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of()));
 
@@ -56,11 +56,32 @@ class AbstractJobProcessorTest {
   }
 
   @Test
+  void should_callJobStatusServiceUpdateProgress_when_doExecuteCallsContextUpdateProgress() {
+    UUID jobId = UUID.randomUUID();
+    stubHeartbeatScheduler();
+    when(jobStatusService.tryMarkProcessing(jobId)).thenReturn(true);
+    JobResult result = new JobResult("bucket/result.csv", 42);
+    TestJobProcessor processor =
+        new TestJobProcessor(
+            () -> {},
+            context -> {
+              context.updateProgress(10);
+              context.updateProgress(20);
+              return result;
+            });
+
+    processor.process(new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of()));
+
+    verify(jobStatusService).updateProgress(jobId, 10);
+    verify(jobStatusService).updateProgress(jobId, 20);
+  }
+
+  @Test
   void should_callMarkFailed_when_validateThrows() {
     UUID jobId = UUID.randomUUID();
     stubHeartbeatScheduler();
     when(jobStatusService.tryMarkProcessing(jobId)).thenReturn(true);
-    Supplier<JobResult> doExecute = mock(Supplier.class);
+    Function<JobContext, JobResult> doExecute = mock(Function.class);
     TestJobProcessor processor =
         new TestJobProcessor(
             () -> {
@@ -70,7 +91,7 @@ class AbstractJobProcessorTest {
 
     processor.process(new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of()));
 
-    verify(doExecute, never()).get();
+    verify(doExecute, never()).apply(any());
     verify(jobStatusService).markFailed(jobId, "payload không hợp lệ");
     verify(heartbeatFuture).cancel(false);
   }
@@ -83,7 +104,7 @@ class AbstractJobProcessorTest {
     TestJobProcessor processor =
         new TestJobProcessor(
             () -> {},
-            () -> {
+            context -> {
               throw new RuntimeException("lỗi khi export");
             });
 
@@ -106,7 +127,7 @@ class AbstractJobProcessorTest {
             () -> {
               throw new IllegalStateException("lỗi nghiệp vụ");
             },
-            mock(Supplier.class));
+            mock(Function.class));
 
     processor.process(new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of()));
 
@@ -122,9 +143,9 @@ class AbstractJobProcessorTest {
   private class TestJobProcessor extends AbstractJobProcessor {
 
     private final Runnable validateAction;
-    private final Supplier<JobResult> executeAction;
+    private final Function<JobContext, JobResult> executeAction;
 
-    TestJobProcessor(Runnable validateAction, Supplier<JobResult> executeAction) {
+    TestJobProcessor(Runnable validateAction, Function<JobContext, JobResult> executeAction) {
       // Runnable::run -- chạy đồng bộ ngay trên thread gọi process(), giữ nguyên các
       // assertion đồng bộ hiện có (test này verify hành vi Template Method, không phải
       // cơ chế executor riêng).
@@ -145,7 +166,7 @@ class AbstractJobProcessorTest {
 
     @Override
     protected JobResult doExecute(JobContext context) {
-      return executeAction.get();
+      return executeAction.apply(context);
     }
   }
 }

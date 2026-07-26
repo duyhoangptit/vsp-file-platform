@@ -43,9 +43,18 @@ public abstract class AbstractJobProcessor implements JobProcessor {
 
   private void runClaimedJob(JobContext context) {
     ScheduledFuture<?> heartbeatTask = startHeartbeat(context.jobId());
+    // Bọc lại context với 1 ProgressReporter thật, ghi jobs.processed_units qua UPDATE nhẹ
+    // (JobStatusService.updateProgress) mỗi khi business processor gọi context.updateProgress()
+    // — không phải full entity save (mục 11 design doc).
+    JobContext contextWithProgressReporter =
+        new JobContext(
+            context.jobId(),
+            context.jobType(),
+            context.payload(),
+            processedUnits -> jobStatusService.updateProgress(context.jobId(), processedUnits));
     try {
-      validate(context.payload());
-      JobResult result = doExecute(context);
+      validate(contextWithProgressReporter.payload());
+      JobResult result = doExecute(contextWithProgressReporter);
       jobStatusService.markDone(context.jobId(), result.resultLocation(), result.processedUnits());
     } catch (Exception e) {
       try {

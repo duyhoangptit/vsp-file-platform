@@ -82,7 +82,8 @@ public class FileAsset {
       long sizeBytes,
       String ownerType,
       UUID ownerId,
-      UUID uploadedBy) {
+      UUID uploadedBy,
+      Instant expiresAt) {
     Instant now = Instant.now();
     this.id = id;
     this.categoryCode = categoryCode;
@@ -96,6 +97,7 @@ public class FileAsset {
     this.ownerType = ownerType;
     this.ownerId = ownerId;
     this.uploadedBy = uploadedBy;
+    this.expiresAt = expiresAt;
     this.createdAt = now;
     this.updatedAt = now;
   }
@@ -112,7 +114,8 @@ public class FileAsset {
       String ownerType,
       UUID ownerId,
       UUID uploadedBy,
-      UUID jobId) {
+      UUID jobId,
+      Instant expiresAt) {
     this(
         id,
         categoryCode,
@@ -123,7 +126,8 @@ public class FileAsset {
         sizeBytes,
         ownerType,
         ownerId,
-        uploadedBy);
+        uploadedBy,
+        expiresAt);
     this.jobId = jobId;
   }
 }

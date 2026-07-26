@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -87,12 +88,17 @@ class ExportUserCsvProcessorTest {
     FileAsset uploadedAsset = mock(FileAsset.class);
     when(uploadedAsset.getObjectKey()).thenReturn("result-object-key");
     when(resultUploader.upload(any(UploadResultCommand.class))).thenReturn(uploadedAsset);
+    JobContext.ProgressReporter progressReporter = mock(JobContext.ProgressReporter.class);
 
     JobResult result =
-        processor.doExecute(new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of()));
+        processor.doExecute(
+            new JobContext(jobId, JobType.EXPORT_USER_CSV, Map.of(), progressReporter));
 
     assertThat(result.resultLocation()).isEqualTo("result-object-key");
     assertThat(result.processedUnits()).isEqualTo(3);
+    // Báo tiến độ 1 lần/trang (page-size=2): trang 1 (2 record) rồi trang 2 (thêm 1, cộng dồn 3).
+    verify(progressReporter, times(1)).report(2);
+    verify(progressReporter, times(1)).report(3);
 
     ArgumentCaptor<UploadResultCommand> commandCaptor =
         ArgumentCaptor.forClass(UploadResultCommand.class);

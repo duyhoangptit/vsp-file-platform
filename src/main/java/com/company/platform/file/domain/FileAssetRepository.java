@@ -32,4 +32,21 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, UUID> {
       @Param("newStatus") StorageStatus newStatus,
       @Param("checksum") String checksum,
       @Param("now") Instant now);
+
+  // Native SQL vì cần LIMIT trong subquery (JPQL không hỗ trợ) — chỉ xử lý tối đa batchSize
+  // dòng của 1 category/lần gọi (mục 10 design doc: dọn metadata sau khi file vật lý đã bị
+  // MinIO lifecycle xoá). Lọc đúng thứ tự cột của index idx_file_assets_category_status_expiry
+  // (category_code, storage_status, expires_at) để tránh full scan trên bảng lớn.
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE file_assets SET deleted_at = :now, updated_at = :now WHERE id IN ("
+              + "SELECT id FROM file_assets WHERE category_code = :categoryCode "
+              + "AND storage_status = 'CLEAN' AND expires_at < :now AND deleted_at IS NULL "
+              + "ORDER BY id LIMIT :batchSize)",
+      nativeQuery = true)
+  int softDeleteExpiredBatch(
+      @Param("categoryCode") String categoryCode,
+      @Param("now") Instant now,
+      @Param("batchSize") int batchSize);
 }

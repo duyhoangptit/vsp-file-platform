@@ -135,6 +135,24 @@ class JobStatusServiceIT {
   }
 
   @Test
+  void should_updateProcessedUnits_when_jobIsProcessing() {
+    UUID jobId = seedProcessingJob();
+
+    jobStatusService.updateProgress(jobId, 250);
+
+    assertThat(jobRepository.findById(jobId).orElseThrow().getProcessedUnits()).isEqualTo(250);
+  }
+
+  @Test
+  void should_notUpdateProcessedUnits_when_jobIsNotProcessing() {
+    UUID jobId = seedPendingJob();
+
+    jobStatusService.updateProgress(jobId, 250);
+
+    assertThat(jobRepository.findById(jobId).orElseThrow().getProcessedUnits()).isEqualTo(0);
+  }
+
+  @Test
   void should_onlyOneWorkerSucceedAndSkipProcessing_when_twoWorkersRaceOnSamePendingJob()
       throws Exception {
     UUID jobId = seedPendingJob();

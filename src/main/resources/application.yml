@@ -76,6 +76,12 @@ app:
   export:
     user-csv:
       page-size: ${APP_EXPORT_USER_CSV_PAGE_SIZE:500}
+  cleanup:
+    # Mục 10/12 design doc: Retention & Cleanup, ngưỡng "chưa quyết định — để config"; giá trị
+    # dưới đây chỉ là mặc định tạm.
+    interval: ${APP_CLEANUP_INTERVAL:15m}
+    batch-size: ${APP_CLEANUP_BATCH_SIZE:500}
+    job-done-retention: ${APP_CLEANUP_JOB_DONE_RETENTION:30d}
 
 # messaging.provider chọn adapter Kafka/Redis cho JobEventPublisher/Consumer (mục 6.2
 # design doc). Cố tình KHÔNG set ở đây (tắt mặc định) để không ảnh hưởng các test/context
