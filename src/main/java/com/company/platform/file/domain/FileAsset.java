@@ -99,4 +99,31 @@ public class FileAsset {
     this.createdAt = now;
     this.updatedAt = now;
   }
+
+  /** Dùng cho file do server tự sinh ra từ 1 job (VD export result) — gắn job_id ngay lúc tạo. */
+  public FileAsset(
+      UUID id,
+      String categoryCode,
+      String bucketName,
+      String objectKey,
+      String originalFilename,
+      String mimeType,
+      long sizeBytes,
+      String ownerType,
+      UUID ownerId,
+      UUID uploadedBy,
+      UUID jobId) {
+    this(
+        id,
+        categoryCode,
+        bucketName,
+        objectKey,
+        originalFilename,
+        mimeType,
+        sizeBytes,
+        ownerType,
+        ownerId,
+        uploadedBy);
+    this.jobId = jobId;
+  }
 }

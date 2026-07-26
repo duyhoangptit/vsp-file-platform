@@ -1,0 +1,80 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-1-create-table-app-users
+      author: platform
+      changes:
+        - createTable:
+            tableName: app_users
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: full_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: phone_number
+                  type: VARCHAR(50)
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(100)
+              - column:
+                  name: city
+                  type: VARCHAR(100)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+  # Bảng demo/test dùng để làm nguồn dữ liệu cho ExportUserCsvProcessor (Phase 4) — repo này
+  # không sở hữu 1 bảng "users" thật (design doc mục 7 coi users.id thuộc DB của service khác,
+  # đọc trực tiếp DB khác). Cố tình đặt tên app_users, không phải users, để tránh đụng tên nếu
+  # sau này có module auth thật. Seed 10.000 dòng qua generate_series thay vì 10.000 insert
+  # riêng lẻ trong YAML.
+  - changeSet:
+      id: 005-2-seed-app-users
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO app_users (id, email, full_name, phone_number, status, role, country, city, created_at, updated_at)
+              SELECT
+                gen_random_uuid(),
+                'user' || s || '@example.com',
+                'Demo User ' || s,
+                '09' || lpad((1000000 + s)::text, 8, '0'),
+                CASE WHEN s % 10 = 0 THEN 'INACTIVE' ELSE 'ACTIVE' END,
+                CASE WHEN s % 25 = 0 THEN 'ADMIN' ELSE 'MEMBER' END,
+                (ARRAY['VN','US','JP','SG','AU'])[1 + (s % 5)],
+                (ARRAY['Hanoi','Ho Chi Minh City','Tokyo','Singapore','Sydney'])[1 + (s % 5)],
+                now() - (s || ' minutes')::interval,
+                now() - (s || ' minutes')::interval
+              FROM generate_series(1, 10000) AS s;

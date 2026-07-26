@@ -7,6 +7,14 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+  task:
+    scheduling:
+      pool:
+        size: 2
+  lifecycle:
+    # Đủ lớn hơn app.job.execution.shutdown-timeout-seconds (mặc định 20s) để
+    # JobDispatchShutdownCoordinator không bị Spring ngắt ngang giữa lúc awaitTermination().
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:25s}
   kafka:
     bootstrap-servers: ${APP_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
@@ -46,6 +54,16 @@ app:
     # 2 JobType hiện tại cũng chỉ là placeholder (chưa có processor thật) nên số liệu dưới
     # đây chỉ là giá trị mặc định tạm, chỉnh qua config khi có nghiệp vụ thật.
     max-active-per-user: ${APP_JOB_MAX_ACTIVE_PER_USER:5}
+    execution:
+      # Executor pool riêng chạy doExecute(), tách khỏi thread gọi process() (mục 6.4).
+      pool-size: ${APP_JOB_EXECUTION_POOL_SIZE:4}
+      # JobDispatchShutdownCoordinator: thời gian chờ job đang chạy hoàn tất trước khi
+      # shutdownNow() ép dừng.
+      shutdown-timeout-seconds: ${APP_JOB_EXECUTION_SHUTDOWN_TIMEOUT_SECONDS:20}
+    # Lưới an toàn mục 6.2: quét PENDING job già hơn interval này để tự trigger dispatch,
+    # phòng trường hợp message (Kafka/Redis) bị mất.
+    fallback-poller:
+      interval: ${APP_JOB_FALLBACK_POLLER_INTERVAL:30s}
     rate-limit:
       EXPORT_USER_CSV:
         capacity: 10
@@ -55,6 +73,9 @@ app:
         capacity: 5
         refill-tokens: 5
         refill-period: 1m
+  export:
+    user-csv:
+      page-size: ${APP_EXPORT_USER_CSV_PAGE_SIZE:500}
 
 # messaging.provider chọn adapter Kafka/Redis cho JobEventPublisher/Consumer (mục 6.2
 # design doc). Cố tình KHÔNG set ở đây (tắt mặc định) để không ảnh hưởng các test/context

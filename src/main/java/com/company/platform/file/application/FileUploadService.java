@@ -12,6 +12,10 @@ import com.company.platform.file.domain.InvalidFileAssetStateException;
 import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.file.storage.MinioStorageService;
 import io.minio.StatObjectResponse;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -117,6 +121,77 @@ public class FileUploadService {
     return fileAssetRepository
         .findById(fileAssetId)
         .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+  }
+
+  /**
+   * Đăng ký 1 file do chính server sinh ra (VD export result), khác với luồng presigned PUT do
+   * client thực hiện ({@link #initiateUpload}/{@link #confirmUpload}) — không cần bước chờ client
+   * upload rồi confirm, vì server đã có sẵn nội dung + checksum. Đi qua đúng chuỗi CAS UPLOADING ->
+   * UPLOADED_DMZ -> CLEAN như confirmUpload để không phải sửa lại logic khi bật virus scan sau này
+   * (mục 5 design doc).
+   */
+  @Transactional
+  public FileAsset registerServerGeneratedFile(RegisterGeneratedFileCommand command) {
+    FileCategory category =
+        fileCategoryRepository
+            .findById(command.categoryCode())
+            .orElseThrow(() -> new FileCategoryNotFoundException(command.categoryCode()));
+
+    minioStorageService.ensureBucketExists(category.getBucketName());
+
+    UUID fileAssetId = UUID.randomUUID();
+    String objectKey = UUID.randomUUID().toString();
+    long sizeBytes = fileSize(command.localFile());
+
+    FileAsset fileAsset =
+        new FileAsset(
+            fileAssetId,
+            category.getCode(),
+            category.getBucketName(),
+            objectKey,
+            command.originalFilename(),
+            command.mimeType(),
+            sizeBytes,
+            command.ownerType(),
+            command.ownerId(),
+            command.uploadedBy(),
+            command.jobId());
+    fileAssetRepository.save(fileAsset);
+
+    minioStorageService.uploadFile(
+        category.getBucketName(), objectKey, command.localFile(), command.mimeType());
+
+    int toDmz =
+        fileAssetRepository.casUpdateStorageStatus(
+            fileAssetId, StorageStatus.UPLOADING, StorageStatus.UPLOADED_DMZ, Instant.now());
+    if (toDmz != 1) {
+      throw new InvalidFileAssetStateException(fileAssetId, StorageStatus.UPLOADING);
+    }
+
+    verifyUploadedObject(fileAsset);
+
+    int toClean =
+        fileAssetRepository.casUpdateStorageStatusWithChecksum(
+            fileAssetId,
+            StorageStatus.UPLOADED_DMZ,
+            StorageStatus.CLEAN,
+            command.checksumSha256(),
+            Instant.now());
+    if (toClean != 1) {
+      throw new InvalidFileAssetStateException(fileAssetId, StorageStatus.UPLOADED_DMZ);
+    }
+
+    return fileAssetRepository
+        .findById(fileAssetId)
+        .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+  }
+
+  private long fileSize(Path localFile) {
+    try {
+      return Files.size(localFile);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Không đọc được kích thước file " + localFile, e);
+    }
   }
 
   private void validate(FileCategory category, InitiateFileUploadCommand command) {

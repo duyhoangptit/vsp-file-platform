@@ -7,8 +7,10 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
+import io.minio.UploadObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,25 @@ public class MinioStorageService {
 
   public String generatePresignedGetUrl(String bucketName, String objectKey, Duration expiry) {
     return presignedUrl(Method.GET, bucketName, objectKey, expiry);
+  }
+
+  /**
+   * Upload trực tiếp 1 file local lên MinIO — dùng cho file server tự sinh ra (VD export result),
+   * khác với luồng presigned PUT do client thực hiện.
+   */
+  public void uploadFile(String bucketName, String objectKey, Path localFile, String contentType) {
+    try {
+      minioClient.uploadObject(
+          UploadObjectArgs.builder()
+              .bucket(bucketName)
+              .object(objectKey)
+              .filename(localFile.toString())
+              .contentType(contentType)
+              .build());
+    } catch (MinioException e) {
+      throw new MinioStorageException(
+          "Không thể upload file %s lên %s/%s".formatted(localFile, bucketName, objectKey), e);
+    }
   }
 
   /** Trả rỗng nếu object không tồn tại (NoSuchKey), ném MinioStorageException cho mọi lỗi khác. */

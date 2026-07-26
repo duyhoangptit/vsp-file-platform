@@ -90,6 +90,13 @@
       <artifactId>lombok</artifactId>
       <optional>true</optional>
     </dependency>
+    <!-- Không có trong Spring Boot BOM, cần khai báo version rõ ràng. Dùng cho
+         CsvRecordWriter (export/csv) để có quoting/escaping CSV đúng chuẩn thay vì tự viết. -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
+      <version>1.14.1</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>

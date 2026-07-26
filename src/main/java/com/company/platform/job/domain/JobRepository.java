@@ -52,6 +52,10 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
   Optional<Job> findByIdempotencyKey(String idempotencyKey);
 
+  // Cheap EXISTS/count-short-circuit query dùng cho fallback poller (mục 6.2) — không load
+  // entity, không cần CAS vì đây chỉ là read để quyết định có nên trigger dispatch hay không.
+  boolean existsByStatusAndCreatedAtBefore(JobStatus status, Instant threshold);
+
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       "UPDATE Job j SET j.status = :newStatus, j.updatedAt = :now "

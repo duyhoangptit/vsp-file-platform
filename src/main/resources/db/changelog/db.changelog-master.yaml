@@ -7,3 +7,7 @@ databaseChangeLog:
       file: db/changelog/changes/003-init-file-assets.yaml
   - include:
       file: db/changelog/changes/004-init-audit-logs.yaml
+  - include:
+      file: db/changelog/changes/005-init-app-users.yaml
+  - include:
+      file: db/changelog/changes/006-seed-file-category-export-result.yaml

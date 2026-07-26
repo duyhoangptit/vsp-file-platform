@@ -11,6 +11,8 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +81,33 @@ class MinioStorageServiceIT {
             BodyHandlers.ofString(StandardCharsets.UTF_8));
     assertThat(getResponse.statusCode()).isEqualTo(200);
     assertThat(getResponse.body()).isEqualTo(content);
+  }
+
+  @Test
+  void should_uploadLocalFileSuccessfully_when_usingUploadFile() throws Exception {
+    String bucketName = "export-" + UUID.randomUUID();
+    String objectKey = UUID.randomUUID().toString();
+    String content = "id,email\n1,a@b.com\n";
+    Path tempFile = Files.createTempFile("upload-file-it-", ".csv");
+    Files.writeString(tempFile, content, StandardCharsets.UTF_8);
+
+    try {
+      minioStorageService.ensureBucketExists(bucketName);
+      minioStorageService.uploadFile(bucketName, objectKey, tempFile, "text/csv");
+
+      String getUrl =
+          minioStorageService.generatePresignedGetUrl(bucketName, objectKey, Duration.ofMinutes(5));
+      HttpClient httpClient = HttpClient.newHttpClient();
+      HttpResponse<String> response =
+          httpClient.send(
+              HttpRequest.newBuilder(URI.create(getUrl)).GET().build(),
+              BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+      assertThat(response.statusCode()).isEqualTo(200);
+      assertThat(response.body()).isEqualTo(content);
+    } finally {
+      Files.deleteIfExists(tempFile);
+    }
   }
 
   @Test

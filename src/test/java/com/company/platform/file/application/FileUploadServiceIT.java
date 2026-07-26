@@ -9,6 +9,9 @@ import com.company.platform.file.domain.FileCategoryRepository;
 import com.company.platform.file.domain.FileValidationException;
 import com.company.platform.file.domain.FileVerificationFailedException;
 import com.company.platform.file.domain.StorageStatus;
+import com.company.platform.job.domain.Job;
+import com.company.platform.job.domain.JobRepository;
+import com.company.platform.job.domain.JobType;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,7 +19,12 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +57,7 @@ class FileUploadServiceIT {
 
   @Autowired private FileUploadService fileUploadService;
   @Autowired private FileCategoryRepository fileCategoryRepository;
+  @Autowired private JobRepository jobRepository;
 
   private String categoryCode;
 
@@ -129,6 +138,50 @@ class FileUploadServiceIT {
                         UUID.randomUUID(),
                         UUID.randomUUID())))
         .isInstanceOf(FileValidationException.class);
+  }
+
+  @Test
+  void should_registerCleanFileAsset_when_registeringServerGeneratedFile() throws Exception {
+    byte[] content = "id,email\n1,a@b.com\n".getBytes(StandardCharsets.UTF_8);
+    Path tempFile = Files.createTempFile("register-generated-it-", ".csv");
+    Files.write(tempFile, content);
+    String checksum = sha256Hex(content);
+    UUID ownerId = UUID.randomUUID();
+    // file_assets.job_id có FK tới jobs.id -- cần 1 Job thật, không dùng UUID.randomUUID() ngẫu
+    // nhiên.
+    Job job =
+        jobRepository.save(
+            new Job(
+                UUID.randomUUID(), JobType.EXPORT_USER_CSV, Map.of(), null, null, null, ownerId));
+    UUID jobId = job.getId();
+
+    try {
+      FileAsset fileAsset =
+          fileUploadService.registerServerGeneratedFile(
+              new RegisterGeneratedFileCommand(
+                  categoryCode,
+                  tempFile,
+                  "text/csv",
+                  "export.csv",
+                  checksum,
+                  "USER",
+                  ownerId,
+                  ownerId,
+                  jobId));
+
+      assertThat(fileAsset.getStorageStatus()).isEqualTo(StorageStatus.CLEAN);
+      assertThat(fileAsset.getChecksumSha256()).isEqualTo(checksum);
+      assertThat(fileAsset.getSizeBytes()).isEqualTo(content.length);
+      assertThat(fileAsset.getOwnerId()).isEqualTo(ownerId);
+      assertThat(fileAsset.getJobId()).isEqualTo(jobId);
+    } finally {
+      Files.deleteIfExists(tempFile);
+    }
+  }
+
+  private String sha256Hex(byte[] content) throws Exception {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    return HexFormat.of().formatHex(digest.digest(content));
   }
 
   private void putToPresignedUrl(String url, byte[] content) throws Exception {

@@ -1,0 +1,12 @@
+databaseChangeLog:
+  # EXPORT_RESULT là category thật (bucket/mime/retention) mà ExportUserCsvProcessor (Phase 4)
+  # cần để hoạt động, không phải dữ liệu demo — khác với seed app_users, changeset này luôn
+  # apply, cùng nhóm với các changeset định nghĩa schema 001-004.
+  - changeSet:
+      id: 006-1-seed-file-category-export-result
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO file_categories (code, bucket_name, allowed_mime_types, max_size_bytes, require_virus_scan, is_public, retention_days)
+              VALUES ('EXPORT_RESULT', 'export-results', '["text/csv"]'::jsonb, 52428800, false, false, 7);

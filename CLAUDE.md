@@ -19,6 +19,27 @@ Modular monolith (Spring Boot) quản lý upload/download file và xử lý job 
   KHÔNG dùng OFFSET lớn, KHÔNG load full list vào memory.
 - Module chỉ được gọi vào package `api` (hoặc `*.public`) của module khác,
   không đụng vào package `internal`.
+- **`DataReader` (dùng trong Export `KitFactory`) luôn nhận `cursor` + `pageSize`
+  thuần, KHÔNG nhận thẳng `EntityManager`/`Repository`/DB-specific type làm tham
+  số** — vì nguồn dữ liệu export có thể là DB local (Phase 4) hoặc API của service
+  khác (khi tách microservice), interface phải trung lập với nguồn dữ liệu:
+
+  ```java
+  interface DataReader<T> {
+      Page<T> readNextPage(String cursor, int pageSize);
+  }
+
+  // impl khi data cùng DB (hiện tại)
+  class LocalDbDataReader<T> implements DataReader<T> { ... }
+
+  // impl khi data ở service khác (tương lai) — gọi REST/gRPC nội bộ,
+  // service business tự kiểm soát tải/rate-limit ở tầng API của họ
+  class RemoteApiDataReader<T> implements DataReader<T> { ... }
+  ```
+
+  `ExportKitFactory.createReader()` quyết định trả về implementation nào theo
+  `job_type`; phần còn lại của pipeline (Writer, Uploader, status, heartbeat)
+  không đổi. Xem thêm mục 7 design doc (Cross-Service Data Access).
 
 ## Cấu trúc thư mục
 
@@ -114,30 +135,30 @@ trước khi báo hoàn thành 1 task.
 
 ```xml
 <plugin>
-    <groupId>com.diffplug.spotless</groupId>
-    <artifactId>spotless-maven-plugin</artifactId>
-    <version>2.44.0</version> <!-- kiểm tra version mới nhất khi setup lần đầu -->
-    <configuration>
-        <java>
-            <googleJavaFormat>
-                <version>1.24.0</version>
-                <style>GOOGLE</style>
-            </googleJavaFormat>
-            <removeUnusedImports/>
-            <importOrder/>
-            <trimTrailingWhitespace/>
-            <endWithNewline/>
-        </java>
-    </configuration>
-    <executions>
-        <execution>
-            <id>spotless-check</id>
-            <phase>validate</phase>
-            <goals>
-                <goal>check</goal>
-            </goals>
-        </execution>
-    </executions>
+  <groupId>com.diffplug.spotless</groupId>
+  <artifactId>spotless-maven-plugin</artifactId>
+  <version>2.44.0</version> <!-- kiểm tra version mới nhất khi setup lần đầu -->
+  <configuration>
+    <java>
+      <googleJavaFormat>
+        <version>1.24.0</version>
+        <style>GOOGLE</style>
+      </googleJavaFormat>
+      <removeUnusedImports/>
+      <importOrder/>
+      <trimTrailingWhitespace/>
+      <endWithNewline/>
+    </java>
+  </configuration>
+  <executions>
+    <execution>
+      <id>spotless-check</id>
+      <phase>validate</phase>
+      <goals>
+        <goal>check</goal>
+      </goals>
+    </execution>
+  </executions>
 </plugin>
 ```
 

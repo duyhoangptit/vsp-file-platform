@@ -47,7 +47,7 @@ class JobSchedulerIT {
   }
 
   private UUID seedPendingJob(short priority) {
-    return seedPendingJob(JobType.EXPORT_USER_CSV, priority);
+    return seedPendingJob(JobType.IMPORT_PRODUCT, priority);
   }
 
   private UUID seedPendingJob(JobType jobType, short priority) {
@@ -93,7 +93,7 @@ class JobSchedulerIT {
 
   @Test
   void should_dispatchToMatchingProcessor_when_pendingJobExists() throws InterruptedException {
-    UUID jobId = seedPendingJob(JobType.EXPORT_USER_CSV, (short) 0);
+    UUID jobId = seedPendingJob(JobType.IMPORT_PRODUCT, (short) 0);
 
     boolean dispatched = jobScheduler.pollAndDispatch();
 
@@ -101,7 +101,7 @@ class JobSchedulerIT {
     JobContext received = receivedContexts.poll(5, TimeUnit.SECONDS);
     assertThat(received).isNotNull();
     assertThat(received.jobId()).isEqualTo(jobId);
-    assertThat(received.jobType()).isEqualTo(JobType.EXPORT_USER_CSV);
+    assertThat(received.jobType()).isEqualTo(JobType.IMPORT_PRODUCT);
   }
 
   @Test
@@ -122,7 +122,7 @@ class JobSchedulerIT {
       return new JobProcessor() {
         @Override
         public JobType supports() {
-          return JobType.EXPORT_USER_CSV;
+          return JobType.IMPORT_PRODUCT;
         }
 
         @Override

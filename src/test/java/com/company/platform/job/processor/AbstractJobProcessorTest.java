@@ -125,7 +125,10 @@ class AbstractJobProcessorTest {
     private final Supplier<JobResult> executeAction;
 
     TestJobProcessor(Runnable validateAction, Supplier<JobResult> executeAction) {
-      super(jobStatusService, heartbeatScheduler);
+      // Runnable::run -- chạy đồng bộ ngay trên thread gọi process(), giữ nguyên các
+      // assertion đồng bộ hiện có (test này verify hành vi Template Method, không phải
+      // cơ chế executor riêng).
+      super(jobStatusService, heartbeatScheduler, Runnable::run);
       this.validateAction = validateAction;
       this.executeAction = executeAction;
     }
