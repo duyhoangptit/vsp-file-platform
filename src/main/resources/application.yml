@@ -57,6 +57,12 @@ management:
       enabled: false
 
 app:
+  # Shared secret cho các endpoint /api/internal/** (VD downloadFileBytes) — service-to-service,
+  # không đại diện end-user nên không dùng UserContext/RequiresAccess (mục 3 design doc
+  # 2026-08-08-internal-download-bytes-api-design.md). Cố tình KHÔNG đặt default thật ở đây,
+  # bắt buộc set qua APP_INTERNAL_API_KEY, thiếu thì app fail fast lúc khởi động.
+  internal-api:
+    key: ${APP_INTERNAL_API_KEY:}
   minio:
     endpoint: ${APP_MINIO_ENDPOINT:http://minio:9000}
     access-key: ${APP_MINIO_ACCESS_KEY:minioadmin}

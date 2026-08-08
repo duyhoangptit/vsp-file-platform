@@ -10,6 +10,8 @@ spring:
       host: localhost
 
 app:
+  internal-api:
+    key: dev-only-internal-api-key
   minio:
     endpoint: http://localhost:9000
 
