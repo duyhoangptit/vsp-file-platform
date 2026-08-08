@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.company.platform.file.application.FileDownloadResult;
 import com.company.platform.file.application.FileDownloadService;
 import com.company.platform.file.application.FileUploadInitiation;
 import com.company.platform.file.application.FileUploadService;
@@ -18,8 +19,11 @@ import com.company.platform.shared.audit.AuditResult;
 import com.company.platform.shared.auth.AccessDeniedException;
 import com.company.platform.shared.auth.UserContext;
 import com.company.platform.shared.lock.AdvisoryLockService;
+import com.company.platform.template.domain.FileTemplate;
+import com.company.platform.template.domain.FileTemplateNotFoundException;
 import com.company.platform.template.domain.FileTemplateRepository;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -91,5 +95,64 @@ class FileTemplateServiceTest {
             eq("FILE_TEMPLATE"),
             any(),
             eq(AuditResult.SUCCESS));
+  }
+
+  @Test
+  void should_returnLatestVersion_when_versionParamIsNull() {
+    UUID userId = UUID.randomUUID();
+    UserContext user = new UserContext(userId, Set.of("MEMBER"));
+    FileTemplate latest =
+        new FileTemplate(
+            UUID.randomUUID(), "MEMBER", "MEMBER_IMPORT", 3, UUID.randomUUID(), "desc", userId);
+    when(fileTemplateRepository
+            .findFirstByCategoryAndTemplateCodeAndDeletedAtIsNullOrderByVersionDesc(
+                "MEMBER", "MEMBER_IMPORT"))
+        .thenReturn(Optional.of(latest));
+    when(fileDownloadService.generateDownloadUrl(latest.getFileId()))
+        .thenReturn(new FileDownloadResult("https://minio/latest", Instant.now()));
+
+    FileDownloadResult result =
+        fileTemplateService.generateDownloadUrl(user, "MEMBER", "MEMBER_IMPORT", null);
+
+    assertThat(result.downloadUrl()).isEqualTo("https://minio/latest");
+    verify(auditLogService)
+        .record(
+            eq(userId),
+            eq("TEMPLATE_DOWNLOADED"),
+            eq("FILE_TEMPLATE"),
+            eq(latest.getId()),
+            eq(AuditResult.SUCCESS));
+  }
+
+  @Test
+  void should_returnRequestedVersion_when_versionParamProvided() {
+    UUID userId = UUID.randomUUID();
+    UserContext user = new UserContext(userId, Set.of("MEMBER"));
+    FileTemplate v1 =
+        new FileTemplate(
+            UUID.randomUUID(), "MEMBER", "MEMBER_IMPORT", 1, UUID.randomUUID(), "desc", userId);
+    when(fileTemplateRepository.findFirstByCategoryAndTemplateCodeAndVersionAndDeletedAtIsNull(
+            "MEMBER", "MEMBER_IMPORT", 1))
+        .thenReturn(Optional.of(v1));
+    when(fileDownloadService.generateDownloadUrl(v1.getFileId()))
+        .thenReturn(new FileDownloadResult("https://minio/v1", Instant.now()));
+
+    FileDownloadResult result =
+        fileTemplateService.generateDownloadUrl(user, "MEMBER", "MEMBER_IMPORT", 1);
+
+    assertThat(result.downloadUrl()).isEqualTo("https://minio/v1");
+  }
+
+  @Test
+  void should_throwFileTemplateNotFoundException_when_noVersionMatches() {
+    UserContext user = new UserContext(UUID.randomUUID(), Set.of("MEMBER"));
+    when(fileTemplateRepository
+            .findFirstByCategoryAndTemplateCodeAndDeletedAtIsNullOrderByVersionDesc(
+                "MEMBER", "MEMBER_IMPORT"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> fileTemplateService.generateDownloadUrl(user, "MEMBER", "MEMBER_IMPORT", null))
+        .isInstanceOf(FileTemplateNotFoundException.class);
   }
 }

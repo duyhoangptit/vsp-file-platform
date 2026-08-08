@@ -1,5 +1,6 @@
 package com.company.platform.template.application;
 
+import com.company.platform.file.application.FileDownloadResult;
 import com.company.platform.file.application.FileDownloadService;
 import com.company.platform.file.application.FileUploadInitiation;
 import com.company.platform.file.application.FileUploadService;
@@ -12,6 +13,7 @@ import com.company.platform.shared.auth.ResourceType;
 import com.company.platform.shared.auth.UserContext;
 import com.company.platform.shared.lock.AdvisoryLockService;
 import com.company.platform.template.domain.FileTemplate;
+import com.company.platform.template.domain.FileTemplateNotFoundException;
 import com.company.platform.template.domain.FileTemplateRepository;
 import com.company.platform.template.domain.TemplateVersionLockTimeoutException;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +42,7 @@ public class FileTemplateService {
   private static final String AUDIT_RESOURCE_TYPE = "FILE_TEMPLATE";
   private static final String ACTION_UPLOAD_INITIATE = "TEMPLATE_UPLOAD_INITIATE";
   private static final String ACTION_UPLOAD_CONFIRM = "TEMPLATE_UPLOAD_CONFIRM";
+  private static final String ACTION_DOWNLOAD = "TEMPLATE_DOWNLOADED";
   private static final int LOCK_MAX_ATTEMPTS = 20;
   private static final Duration LOCK_RETRY_DELAY = Duration.ofMillis(25);
 
@@ -111,6 +114,30 @@ public class FileTemplateService {
             command.description(),
             user.userId());
     return fileTemplateRepository.save(fileTemplate);
+  }
+
+  public FileDownloadResult generateDownloadUrl(
+      UserContext user, String category, String templateCode, Integer version) {
+    FileTemplate fileTemplate =
+        version == null
+            ? fileTemplateRepository
+                .findFirstByCategoryAndTemplateCodeAndDeletedAtIsNullOrderByVersionDesc(
+                    category, templateCode)
+                .orElseThrow(() -> new FileTemplateNotFoundException(category, templateCode))
+            : fileTemplateRepository
+                .findFirstByCategoryAndTemplateCodeAndVersionAndDeletedAtIsNull(
+                    category, templateCode, version)
+                .orElseThrow(
+                    () -> new FileTemplateNotFoundException(category, templateCode, version));
+
+    FileDownloadResult result = fileDownloadService.generateDownloadUrl(fileTemplate.getFileId());
+    auditLogService.record(
+        user.userId(),
+        ACTION_DOWNLOAD,
+        AUDIT_RESOURCE_TYPE,
+        fileTemplate.getId(),
+        AuditResult.SUCCESS);
+    return result;
   }
 
   // pg_try_advisory_xact_lock không block — thử lại có giới hạn (tối đa 20 lần x 25ms = 500ms)
