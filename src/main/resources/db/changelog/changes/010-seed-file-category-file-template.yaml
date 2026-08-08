@@ -1,0 +1,13 @@
+databaseChangeLog:
+  # FILE_TEMPLATE là category thật mà FileTemplateService cần để hoạt động (bucket/mime/size dùng
+  # chung cho mọi file template bất kể category/templateCode nghiệp vụ), không phải dữ liệu demo —
+  # cùng nhóm với 006/007/008. retention_days = NULL vì template là tài liệu tham chiếu, không hết
+  # hạn tự động.
+  - changeSet:
+      id: 010-1-seed-file-category-file-template
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO file_categories (code, bucket_name, allowed_mime_types, max_size_bytes, require_virus_scan, is_public, retention_days)
+              VALUES ('FILE_TEMPLATE', 'file-templates', '["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","text/csv"]'::jsonb, 10485760, false, true, NULL);

@@ -1,0 +1,80 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-1-create-table-file-template-manager
+      author: platform
+      changes:
+        - createTable:
+            tableName: file_template_manager
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: category
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_code
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: file_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(500)
+              - column:
+                  name: created_by
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: UUID
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: TIMESTAMP
+
+  - changeSet:
+      id: 009-2-unique-file-template-manager-category-code-version
+      author: platform
+      changes:
+        - addUniqueConstraint:
+            tableName: file_template_manager
+            columnNames: category, template_code, version
+            constraintName: uk_file_template_manager_category_code_version
+
+  - changeSet:
+      id: 009-3-fk-file-template-manager-file-id
+      author: platform
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: file_template_manager
+            baseColumnNames: file_id
+            referencedTableName: file_assets
+            referencedColumnNames: id
+            constraintName: fk_file_template_manager_file_id

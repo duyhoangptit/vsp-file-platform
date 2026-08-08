@@ -72,4 +72,6 @@ logs/
 .env
 .env.local
 /target/
-*.jar
+
+### Superpowers ###
+.worktrees/
