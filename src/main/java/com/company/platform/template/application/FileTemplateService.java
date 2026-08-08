@@ -79,6 +79,15 @@ public class FileTemplateService {
         initiation.fileAssetId(), initiation.uploadUrl(), initiation.expiresAt());
   }
 
+  /**
+   * Method này (và mọi method @Transactional gọi nó, VD initiateUpload ở trên, hoặc confirmUpload
+   * sẽ thêm ở Task 4) throw AccessDeniedException ngay sau khi ghi audit DENIED — nếu
+   * AuditLogService.record(...) chạy trong cùng transaction, exception unchecked đó sẽ đánh dấu
+   * transaction rollback-only và dòng audit DENIED vừa ghi bị cuốn theo, không bao giờ tới được DB.
+   * AuditLogService.record(...) đã được khai báo REQUIRES_NEW (xem comment ở đó) chính để giải
+   * quyết việc này một cách chung — nó luôn commit độc lập với transaction của caller, nên
+   * requireAdmin không cần (và không nên) tự tách transaction ở đây nữa.
+   */
   private void requireAdmin(UserContext user, String action, String category, String templateCode) {
     boolean isAdmin = user.roles().contains(ROLE_ADMIN);
     auditLogService.record(
