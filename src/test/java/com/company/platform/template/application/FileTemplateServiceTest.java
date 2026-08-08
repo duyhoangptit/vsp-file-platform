@@ -51,7 +51,7 @@ class FileTemplateServiceTest {
 
     verify(fileUploadService, never()).initiateUpload(any());
     verify(auditLogService)
-        .record(
+        .recordIndependently(
             eq(member.userId()),
             eq("TEMPLATE_UPLOAD_INITIATE"),
             eq("FILE_TEMPLATE"),
@@ -85,7 +85,7 @@ class FileTemplateServiceTest {
     assertThat(captor.getValue().originalFilename()).isEqualTo("member-import.xlsx");
 
     verify(auditLogService)
-        .record(
+        .recordIndependently(
             eq(adminId),
             eq("TEMPLATE_UPLOAD_INITIATE"),
             eq("FILE_TEMPLATE"),

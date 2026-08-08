@@ -28,8 +28,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * audit DENIED vừa ghi bị cuốn theo, không bao giờ tới DB thật — Mockito-based {@code
  * FileTemplateServiceTest} không bắt được lỗi này vì mock không tham gia transaction thật của
  * Spring. Test này dùng Postgres thật (Testcontainers) + Spring transaction manager thật để chứng
- * minh: sau fix (REQUIRES_NEW ở {@code AuditLogService.record}), dòng audit DENIED persist dù
- * {@code initiateUpload} rollback ngay sau đó.
+ * minh: sau fix ({@code requireAdmin} ghi qua {@code AuditLogService.recordIndependently},
+ * REQUIRES_NEW — xem comment ở đó), dòng audit DENIED persist dù {@code initiateUpload} rollback
+ * ngay sau đó. Dùng {@code recordIndependently} thay vì áp REQUIRES_NEW lên {@code record} dùng
+ * chung, để không đổi hành vi transaction của các caller khác đang dùng {@code record} (VD {@code
+ * AuditedTransitionAspect} trong các method CAS-transition @Transactional của {@code
+ * JobStatusService}).
  */
 @SpringBootTest(webEnvironment = WebEnvironment.NONE)
 @Testcontainers

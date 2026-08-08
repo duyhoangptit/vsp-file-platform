@@ -14,25 +14,32 @@ public class AuditLogService {
     this.auditLogRepository = auditLogRepository;
   }
 
+  public void record(
+      UUID actorId, String action, String resourceType, UUID resourceId, AuditResult result) {
+    auditLogRepository.save(new AuditLog(actorId, action, resourceType, resourceId, null, result));
+  }
+
   /**
-   * REQUIRES_NEW: audit_logs là append-only evidence của 1 quyết định (kể cả DENIED) — nó phải tồn
-   * tại độc lập với việc phần business logic gọi nó có rollback hay không. Nếu chạy trong
-   * transaction của caller (VD 1 method @Transactional throw AccessDeniedException ngay sau khi gọi
-   * record(...) để từ chối), Spring sẽ đánh dấu transaction đó rollback-only vì exception
-   * unchecked, kéo theo dòng audit DENIED vừa ghi cũng bị rollback theo — mất bằng chứng cho đúng
-   * nhánh cần audit nhất. REQUIRES_NEW mở 1 transaction riêng, commit ngay khi record() trả về, nên
-   * audit luôn persist bất kể caller sau đó có throw/rollback hay không.
+   * Giống {@link #record}, nhưng chạy trong 1 transaction riêng (REQUIRES_NEW), commit ngay khi trả
+   * về — dành cho caller mà bản thân audit write phải sống sót độc lập với việc phần business logic
+   * bao ngoài có rollback hay không (VD {@code FileTemplateService.requireAdmin}: ghi audit DENIED
+   * rồi throw AccessDeniedException ngay trong 1 method @Transactional — nếu dùng {@link #record}
+   * thường, exception unchecked sẽ đánh dấu transaction đó rollback-only và cuốn theo dòng audit
+   * DENIED vừa ghi, mất bằng chứng cho đúng nhánh cần audit nhất).
    *
-   * <p>Không đổi hành vi của caller hiện có ({@code ResourceAccessAuditAspect}, {@code
-   * AuditedTransitionAspect}): cả 2 gọi record() khi bản thân chưa nằm trong transaction nào (bám
-   * vào canAccess()/CAS-transition method không @Transactional), nên trước đây record() luôn tự mở
-   * transaction mới của riêng nó — REQUIRES_NEW chỉ làm tường minh hành vi đó, không thay đổi gì
-   * cho 2 caller này. Nơi thực sự cần REQUIRES_NEW là caller có @Transactional bao ngoài, ví dụ
-   * {@code FileTemplateService.requireAdmin} (gọi record() rồi throw AccessDeniedException) — xem
-   * comment ở đó.
+   * <p>Cố tình KHÔNG áp REQUIRES_NEW lên {@link #record} dùng chung, để không đổi hành vi
+   * transaction hiện tại của 2 caller khác đang dùng nó ({@code ResourceAccessAuditAspect}, {@code
+   * AuditedTransitionAspect} — cái sau chạy trong cùng transaction @Transactional của các method
+   * CAS-transition ở {@code JobStatusService}, ví dụ tryMarkProcessing/markDone/markFailed). Với
+   * {@code AuditedTransitionAspect}, audit chỉ nên trở thành durable khi transaction CAS bao ngoài
+   * thật sự commit thành công — tách nó ra thành REQUIRES_NEW sẽ khiến audit có thể commit độc lập
+   * trước cả khi biết outer transaction có commit được hay không (rủi ro hẹp nhưng có thật nếu
+   * commit của outer transaction fail sau đó), nên giữ nguyên hành vi cũ cho những caller này. Chỉ
+   * dùng {@link #recordIndependently} khi rõ ràng cần tính chất "audit luôn persist bất kể caller
+   * rollback" như mô tả ở trên.
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void record(
+  public void recordIndependently(
       UUID actorId, String action, String resourceType, UUID resourceId, AuditResult result) {
     auditLogRepository.save(new AuditLog(actorId, action, resourceType, resourceId, null, result));
   }

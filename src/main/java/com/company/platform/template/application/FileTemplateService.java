@@ -81,16 +81,17 @@ public class FileTemplateService {
 
   /**
    * Method này (và mọi method @Transactional gọi nó, VD initiateUpload ở trên, hoặc confirmUpload
-   * sẽ thêm ở Task 4) throw AccessDeniedException ngay sau khi ghi audit DENIED — nếu
-   * AuditLogService.record(...) chạy trong cùng transaction, exception unchecked đó sẽ đánh dấu
+   * sẽ thêm ở Task 4) throw AccessDeniedException ngay sau khi ghi audit DENIED — nếu ghi bằng
+   * AuditLogService.record(...) thường trong cùng transaction, exception unchecked đó sẽ đánh dấu
    * transaction rollback-only và dòng audit DENIED vừa ghi bị cuốn theo, không bao giờ tới được DB.
-   * AuditLogService.record(...) đã được khai báo REQUIRES_NEW (xem comment ở đó) chính để giải
-   * quyết việc này một cách chung — nó luôn commit độc lập với transaction của caller, nên
-   * requireAdmin không cần (và không nên) tự tách transaction ở đây nữa.
+   * Vì vậy dùng {@code recordIndependently} (REQUIRES_NEW, xem comment ở đó) thay vì {@code record}
+   * thường — audit luôn commit độc lập với transaction của caller, bất kể sau đó có throw/rollback
+   * hay không. Ghi cả 2 nhánh ALLOW/DENIED qua cùng method này để nhất quán, dù DENIED mới là nhánh
+   * thật sự cần tính chất này (nhánh ALLOW không throw nên transaction vẫn commit bình thường).
    */
   private void requireAdmin(UserContext user, String action, String category, String templateCode) {
     boolean isAdmin = user.roles().contains(ROLE_ADMIN);
-    auditLogService.record(
+    auditLogService.recordIndependently(
         user.userId(),
         action,
         AUDIT_RESOURCE_TYPE,
