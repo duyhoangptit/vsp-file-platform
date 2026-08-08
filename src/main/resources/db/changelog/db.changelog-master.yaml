@@ -15,3 +15,7 @@ databaseChangeLog:
       file: db/changelog/changes/007-seed-file-category-import-raw.yaml
   - include:
       file: db/changelog/changes/008-seed-file-category-import-error-report.yaml
+  - include:
+      file: db/changelog/changes/009-init-file-template-manager.yaml
+  - include:
+      file: db/changelog/changes/010-seed-file-category-file-template.yaml
