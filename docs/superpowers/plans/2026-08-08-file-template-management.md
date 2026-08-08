@@ -34,7 +34,7 @@
 **Interfaces:**
 - Produces: bảng `file_template_manager` (cột: `id UUID PK`, `category VARCHAR(100)`, `template_code VARCHAR(100)`, `version INT`, `file_id UUID FK→file_assets.id`, `description VARCHAR(500)`, `created_by UUID`, `created_at TIMESTAMP`, `updated_by UUID`, `updated_at TIMESTAMP`, `deleted_at TIMESTAMP`), unique constraint `(category, template_code, version)`. Row `file_categories.code = 'FILE_TEMPLATE'`.
 
-- [ ] **Step 1: Tạo changeset bảng `file_template_manager`**
+- [x] **Step 1: Tạo changeset bảng `file_template_manager`**
 
 `src/main/resources/db/changelog/changes/009-init-file-template-manager.yaml`:
 
@@ -121,7 +121,7 @@ databaseChangeLog:
             constraintName: fk_file_template_manager_file_id
 ```
 
-- [ ] **Step 2: Tạo changeset seed category `FILE_TEMPLATE`**
+- [x] **Step 2: Tạo changeset seed category `FILE_TEMPLATE`**
 
 `src/main/resources/db/changelog/changes/010-seed-file-category-file-template.yaml`:
 
@@ -141,7 +141,7 @@ databaseChangeLog:
               VALUES ('FILE_TEMPLATE', 'file-templates', '["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","text/csv"]'::jsonb, 10485760, false, true, NULL);
 ```
 
-- [ ] **Step 3: Đăng ký 2 changeset vào master changelog**
+- [x] **Step 3: Đăng ký 2 changeset vào master changelog**
 
 Modify `src/main/resources/db/changelog/db.changelog-master.yaml`, thêm vào cuối:
 
@@ -152,12 +152,12 @@ Modify `src/main/resources/db/changelog/db.changelog-master.yaml`, thêm vào cu
       file: db/changelog/changes/010-seed-file-category-file-template.yaml
 ```
 
-- [ ] **Step 4: Verify Liquibase syntax bằng cách chạy build**
+- [x] **Step 4: Verify Liquibase syntax bằng cách chạy build**
 
 Run: `mvn -q -DskipTests compile`
 Expected: BUILD SUCCESS (Liquibase changelog chỉ thật sự chạy khi Spring context khởi động — sẽ được verify đầy đủ ở Task 2's IT test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/resources/db/changelog/changes/009-init-file-template-manager.yaml \
@@ -187,7 +187,7 @@ git commit -m "Add DB schema for file template management (file_template_manager
   - `FileTemplateNotFoundException(String category, String templateCode)` và `FileTemplateNotFoundException(String category, String templateCode, int version)`.
   - `TemplateVersionLockTimeoutException(String category, String templateCode)`.
 
-- [ ] **Step 1: Viết `FileTemplate` entity**
+- [x] **Step 1: Viết `FileTemplate` entity**
 
 `src/main/java/com/company/platform/template/domain/FileTemplate.java`:
 
@@ -263,7 +263,7 @@ public class FileTemplate {
 }
 ```
 
-- [ ] **Step 2: Viết `FileTemplateRepository`**
+- [x] **Step 2: Viết `FileTemplateRepository`**
 
 `src/main/java/com/company/platform/template/domain/FileTemplateRepository.java`:
 
@@ -291,7 +291,7 @@ public interface FileTemplateRepository extends JpaRepository<FileTemplate, UUID
 }
 ```
 
-- [ ] **Step 3: Viết 2 exception**
+- [x] **Step 3: Viết 2 exception**
 
 `src/main/java/com/company/platform/template/domain/FileTemplateNotFoundException.java`:
 
@@ -329,7 +329,7 @@ public class TemplateVersionLockTimeoutException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 4: Viết integration test cho repository (Testcontainers Postgres)**
+- [x] **Step 4: Viết integration test cho repository (Testcontainers Postgres)**
 
 `src/test/java/com/company/platform/template/domain/FileTemplateRepositoryIT.java`:
 
@@ -448,12 +448,12 @@ class FileTemplateRepositoryIT {
 }
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `mvn verify -Pintegration-test -Dit.test=FileTemplateRepositoryIT` (cần Docker chạy sẵn cho Testcontainers)
 Expected: PASS (5 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/company/platform/template/domain/ \
@@ -480,7 +480,7 @@ git commit -m "Add FileTemplate entity, repository and domain exceptions"
   - `FileTemplateService.initiateUpload(UserContext user, InitiateTemplateUploadCommand command): TemplateUploadInitiation` — dùng ở Task 6.
   - `ResourceType.FILE_TEMPLATE` — enum constant mới, dùng cho `AccessDeniedException`.
 
-- [ ] **Step 1: Thêm `ResourceType.FILE_TEMPLATE`**
+- [x] **Step 1: Thêm `ResourceType.FILE_TEMPLATE`**
 
 Modify `src/main/java/com/company/platform/shared/auth/ResourceType.java`:
 
@@ -496,7 +496,7 @@ public enum ResourceType {
 
 (Không có `ResourceOwnerLookup` cho `FILE_TEMPLATE` — không sao, vì quyền template check qua role thuần, không đi qua `ResourceAuthorizationService.canAccess(...)`. `ResourceType.FILE_TEMPLATE` chỉ dùng để gắn nhãn đúng loại resource trong `AccessDeniedException`.)
 
-- [ ] **Step 2: Viết command + result record**
+- [x] **Step 2: Viết command + result record**
 
 `src/main/java/com/company/platform/template/application/InitiateTemplateUploadCommand.java`:
 
@@ -522,7 +522,7 @@ import java.util.UUID;
 public record TemplateUploadInitiation(UUID fileAssetId, String uploadUrl, Instant expiresAt) {}
 ```
 
-- [ ] **Step 3: Viết test trước (mock, chưa có class `FileTemplateService`)**
+- [x] **Step 3: Viết test trước (mock, chưa có class `FileTemplateService`)**
 
 `src/test/java/com/company/platform/template/application/FileTemplateServiceTest.java`:
 
@@ -620,12 +620,12 @@ class FileTemplateServiceTest {
 }
 ```
 
-- [ ] **Step 4: Chạy test để thấy fail (chưa có `FileTemplateService`)**
+- [x] **Step 4: Chạy test để thấy fail (chưa có `FileTemplateService`)**
 
 Run: `mvn test -Dtest=FileTemplateServiceTest`
 Expected: FAIL biên dịch — không tìm thấy class `FileTemplateService`.
 
-- [ ] **Step 5: Viết `FileTemplateService` (chỉ phần `initiateUpload` + hạ tầng dùng chung cho các task sau)**
+- [x] **Step 5: Viết `FileTemplateService` (chỉ phần `initiateUpload` + hạ tầng dùng chung cho các task sau)**
 
 `src/main/java/com/company/platform/template/application/FileTemplateService.java`:
 
@@ -734,12 +734,12 @@ public class FileTemplateService {
 
 (Các field/hằng số `fileTemplateRepository`, `fileDownloadService`, `advisoryLockService`, `LOCK_MAX_ATTEMPTS`, `LOCK_RETRY_DELAY` chưa dùng ở task này nhưng cần khai báo sẵn trong constructor vì Task 4/5 sẽ bổ sung method dùng chúng — tránh phải sửa lại chữ ký constructor giữa các task.)
 
-- [ ] **Step 6: Chạy lại test, xác nhận PASS**
+- [x] **Step 6: Chạy lại test, xác nhận PASS**
 
 Run: `mvn test -Dtest=FileTemplateServiceTest`
 Expected: PASS (2 test). Có thể có warning "unused field" cho `fileTemplateRepository`/`fileDownloadService`/`advisoryLockService`/`LOCK_MAX_ATTEMPTS`/`LOCK_RETRY_DELAY` — bỏ qua, sẽ dùng ở Task 4/5.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/main/java/com/company/platform/shared/auth/ResourceType.java \
@@ -761,7 +761,7 @@ git commit -m "Add FileTemplateService.initiateUpload with ADMIN-only access che
 - Consumes: `FileUploadService.confirmUpload(UUID, String): FileAsset` (`file.application`), `FileAsset.getOwnerId()/getId()` (`file.domain`).
 - Produces: `ConfirmTemplateUploadCommand(UUID fileAssetId, String category, String templateCode, String checksumSha256, String description)`, `FileTemplateService.confirmUpload(UserContext, ConfirmTemplateUploadCommand): FileTemplate` — dùng ở Task 6.
 
-- [ ] **Step 1: Viết command record**
+- [x] **Step 1: Viết command record**
 
 `src/main/java/com/company/platform/template/application/ConfirmTemplateUploadCommand.java`:
 
@@ -774,7 +774,7 @@ public record ConfirmTemplateUploadCommand(
     UUID fileAssetId, String category, String templateCode, String checksumSha256, String description) {}
 ```
 
-- [ ] **Step 2: Viết integration test trước (Testcontainers Postgres + MinIO)**
+- [x] **Step 2: Viết integration test trước (Testcontainers Postgres + MinIO)**
 
 `src/test/java/com/company/platform/template/application/FileTemplateServiceIT.java`:
 
@@ -929,12 +929,12 @@ class FileTemplateServiceIT {
 }
 ```
 
-- [ ] **Step 3: Chạy test, xác nhận fail (chưa có `confirmUpload`)**
+- [x] **Step 3: Chạy test, xác nhận fail (chưa có `confirmUpload`)**
 
 Run: `mvn verify -Pintegration-test -Dit.test=FileTemplateServiceIT`
 Expected: FAIL biên dịch — không tìm thấy method `FileTemplateService.confirmUpload`.
 
-- [ ] **Step 4: Thêm `confirmUpload` + `acquireVersionLock` vào `FileTemplateService`**
+- [x] **Step 4: Thêm `confirmUpload` + `acquireVersionLock` vào `FileTemplateService`**
 
 Modify `src/main/java/com/company/platform/template/application/FileTemplateService.java` — thêm import và method:
 
@@ -1008,12 +1008,12 @@ Thêm method (sau `initiateUpload`):
   }
 ```
 
-- [ ] **Step 5: Chạy lại test, xác nhận PASS**
+- [x] **Step 5: Chạy lại test, xác nhận PASS**
 
 Run: `mvn verify -Pintegration-test -Dit.test=FileTemplateServiceIT`
 Expected: PASS (4 test) — bao gồm test race condition với 5 thread đồng thời cho cùng `(category, templateCode)`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/company/platform/template/application/ \
@@ -1033,7 +1033,7 @@ git commit -m "Add FileTemplateService.confirmUpload with advisory-lock-protecte
 - Consumes: `FileDownloadService.generateDownloadUrl(UUID): FileDownloadResult` (`file.application`), `FileTemplateRepository.findFirstByCategoryAndTemplateCodeAndDeletedAtIsNullOrderByVersionDesc`/`findFirstByCategoryAndTemplateCodeAndVersionAndDeletedAtIsNull` (Task 2).
 - Produces: `FileTemplateService.generateDownloadUrl(UserContext user, String category, String templateCode, Integer version): FileDownloadResult` — dùng ở Task 6.
 
-- [ ] **Step 1: Thêm test cho `generateDownloadUrl` (mock)**
+- [x] **Step 1: Thêm test cho `generateDownloadUrl` (mock)**
 
 Modify `src/test/java/com/company/platform/template/application/FileTemplateServiceTest.java` — thêm import và test:
 
@@ -1102,12 +1102,12 @@ Thêm vào cuối class (trước dấu `}` cuối):
   }
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail (chưa có `generateDownloadUrl`)**
+- [x] **Step 2: Chạy test, xác nhận fail (chưa có `generateDownloadUrl`)**
 
 Run: `mvn test -Dtest=FileTemplateServiceTest`
 Expected: FAIL biên dịch — không tìm thấy method `FileTemplateService.generateDownloadUrl`.
 
-- [ ] **Step 3: Thêm method vào `FileTemplateService`**
+- [x] **Step 3: Thêm method vào `FileTemplateService`**
 
 Modify `src/main/java/com/company/platform/template/application/FileTemplateService.java` — thêm import và hằng số:
 
@@ -1148,12 +1148,12 @@ Thêm method (sau `confirmUpload`):
   }
 ```
 
-- [ ] **Step 4: Chạy lại test, xác nhận PASS**
+- [x] **Step 4: Chạy lại test, xác nhận PASS**
 
 Run: `mvn test -Dtest=FileTemplateServiceTest`
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/company/platform/template/application/FileTemplateService.java \
@@ -1179,7 +1179,7 @@ git commit -m "Add FileTemplateService.generateDownloadUrl with latest/specific 
 - Consumes: `FileTemplateService.initiateUpload/confirmUpload/generateDownloadUrl` (Task 3/4/5), `UserContext` (`shared.auth`).
 - Produces: `POST /api/templates/upload/initiate`, `POST /api/templates/upload/confirm`, `GET /api/templates/download-url` — dùng ở Task 7.
 
-- [ ] **Step 1: Viết DTO request/response**
+- [x] **Step 1: Viết DTO request/response**
 
 `src/main/java/com/company/platform/template/api/InitiateTemplateUploadRequest.java`:
 
@@ -1301,7 +1301,7 @@ public record TemplateDownloadUrlResponse(
 }
 ```
 
-- [ ] **Step 2: Viết `TemplateApiExceptionHandler`**
+- [x] **Step 2: Viết `TemplateApiExceptionHandler`**
 
 `src/main/java/com/company/platform/template/api/TemplateApiExceptionHandler.java`:
 
@@ -1379,7 +1379,7 @@ public class TemplateApiExceptionHandler {
 }
 ```
 
-- [ ] **Step 3: Viết `FileTemplateController`**
+- [x] **Step 3: Viết `FileTemplateController`**
 
 `src/main/java/com/company/platform/template/api/FileTemplateController.java`:
 
@@ -1471,7 +1471,7 @@ public class FileTemplateController {
 }
 ```
 
-- [ ] **Step 4: Viết `@WebMvcTest`**
+- [x] **Step 4: Viết `@WebMvcTest`**
 
 `src/test/java/com/company/platform/template/api/FileTemplateControllerTest.java`:
 
@@ -1593,12 +1593,12 @@ class FileTemplateControllerTest {
 }
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `mvn test -Dtest=FileTemplateControllerTest`
 Expected: PASS (5 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/company/platform/template/api/ \
@@ -1616,7 +1616,7 @@ git commit -m "Add FileTemplateController with initiate/confirm upload and downl
 **Interfaces:**
 - Consumes: toàn bộ `FileTemplateController` (Task 6) qua HTTP thật (MockMvc) + MinIO thật cho PUT/GET nội dung file.
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 `src/test/java/com/company/platform/template/api/FileTemplateEndToEndIT.java`:
 
@@ -1818,12 +1818,12 @@ class FileTemplateEndToEndIT {
 }
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `mvn verify -Pintegration-test -Dit.test=FileTemplateEndToEndIT`
 Expected: PASS (1 test, verify toàn bộ chuỗi HTTP + DB + MinIO).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/test/java/com/company/platform/template/api/FileTemplateEndToEndIT.java
@@ -1836,7 +1836,7 @@ git commit -m "Add end-to-end IT for file template upload/download flow"
 
 **Files:** không tạo/sửa file mới — chỉ chạy lệnh verify.
 
-- [ ] **Step 1: Format code**
+- [x] **Step 1: Format code**
 
 Run: `mvn spotless:apply`
 Expected: BUILD SUCCESS. Nếu có file bị format lại, commit riêng:
@@ -1846,21 +1846,21 @@ git add -A
 git commit -m "Apply spotless formatting" --allow-empty
 ```
 
-- [ ] **Step 2: Chạy full unit test suite**
+- [x] **Step 2: Chạy full unit test suite**
 
 Run: `mvn test`
 Expected: BUILD SUCCESS, tất cả test pass (bao gồm `FileTemplateServiceTest`, `FileTemplateControllerTest` mới thêm, không ảnh hưởng test cũ).
 
-- [ ] **Step 3: Chạy full integration test suite (cần Docker)**
+- [x] **Step 3: Chạy full integration test suite (cần Docker)**
 
 Run: `mvn verify -Pintegration-test`
 Expected: BUILD SUCCESS, bao gồm `FileTemplateRepositoryIT`, `FileTemplateServiceIT`, `FileTemplateEndToEndIT` mới thêm.
 
-- [ ] **Step 4: Chạy full build (đúng lệnh CI dùng)**
+- [x] **Step 4: Chạy full build (đúng lệnh CI dùng)**
 
 Run: `mvn clean install`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 5: Báo cáo kết quả**
+- [x] **Step 5: Báo cáo kết quả**
 
 Không cần commit thêm ở bước này nếu Step 1 không có thay đổi — chỉ xác nhận trạng thái build sạch trước khi coi tính năng hoàn tất.
