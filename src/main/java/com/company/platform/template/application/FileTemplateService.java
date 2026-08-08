@@ -4,13 +4,16 @@ import com.company.platform.file.application.FileDownloadService;
 import com.company.platform.file.application.FileUploadInitiation;
 import com.company.platform.file.application.FileUploadService;
 import com.company.platform.file.application.InitiateFileUploadCommand;
+import com.company.platform.file.domain.FileAsset;
 import com.company.platform.shared.audit.AuditLogService;
 import com.company.platform.shared.audit.AuditResult;
 import com.company.platform.shared.auth.AccessDeniedException;
 import com.company.platform.shared.auth.ResourceType;
 import com.company.platform.shared.auth.UserContext;
 import com.company.platform.shared.lock.AdvisoryLockService;
+import com.company.platform.template.domain.FileTemplate;
 import com.company.platform.template.domain.FileTemplateRepository;
+import com.company.platform.template.domain.TemplateVersionLockTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
@@ -36,6 +39,7 @@ public class FileTemplateService {
   private static final String TEMPLATE_OWNER_TYPE = "FILE_TEMPLATE";
   private static final String AUDIT_RESOURCE_TYPE = "FILE_TEMPLATE";
   private static final String ACTION_UPLOAD_INITIATE = "TEMPLATE_UPLOAD_INITIATE";
+  private static final String ACTION_UPLOAD_CONFIRM = "TEMPLATE_UPLOAD_CONFIRM";
   private static final int LOCK_MAX_ATTEMPTS = 20;
   private static final Duration LOCK_RETRY_DELAY = Duration.ofMillis(25);
 
@@ -77,6 +81,60 @@ public class FileTemplateService {
 
     return new TemplateUploadInitiation(
         initiation.fileAssetId(), initiation.uploadUrl(), initiation.expiresAt());
+  }
+
+  /**
+   * Version kế tiếp tính trong cùng transaction với FileUploadService#confirmUpload, bảo vệ bằng
+   * pg_try_advisory_xact_lock (tái dùng AdvisoryLockService có sẵn) khoá theo (category,
+   * templateCode) để 2 lần confirm đồng thời cho cùng cặp này không đụng version — lock tự nhả khi
+   * transaction kết thúc (commit/rollback).
+   */
+  @Transactional
+  public FileTemplate confirmUpload(UserContext user, ConfirmTemplateUploadCommand command) {
+    requireAdmin(user, ACTION_UPLOAD_CONFIRM, command.category(), command.templateCode());
+
+    FileAsset fileAsset =
+        fileUploadService.confirmUpload(command.fileAssetId(), command.checksumSha256());
+    UUID templateId = fileAsset.getOwnerId();
+
+    acquireVersionLock(command.category(), command.templateCode());
+    int nextVersion =
+        fileTemplateRepository.findMaxVersion(command.category(), command.templateCode()) + 1;
+
+    FileTemplate fileTemplate =
+        new FileTemplate(
+            templateId,
+            command.category(),
+            command.templateCode(),
+            nextVersion,
+            fileAsset.getId(),
+            command.description(),
+            user.userId());
+    return fileTemplateRepository.save(fileTemplate);
+  }
+
+  // pg_try_advisory_xact_lock không block — thử lại có giới hạn (tối đa 20 lần x 25ms = 500ms)
+  // thay vì bỏ qua như CleanupService, vì ở đây bắt buộc phải lấy được lock để version không bị
+  // đụng, không chấp nhận được việc "bỏ qua tick này". 500ms đủ rộng vì phần giữ lock chỉ gồm 1
+  // SELECT MAX + 1 INSERT (nhanh), phù hợp cho thao tác quản trị tần suất thấp.
+  private void acquireVersionLock(String category, String templateCode) {
+    long lockKey = (category + "|" + templateCode).hashCode();
+    for (int attempt = 0; attempt < LOCK_MAX_ATTEMPTS; attempt++) {
+      if (advisoryLockService.tryLock(lockKey)) {
+        return;
+      }
+      sleepBeforeRetry();
+    }
+    throw new TemplateVersionLockTimeoutException(category, templateCode);
+  }
+
+  private void sleepBeforeRetry() {
+    try {
+      Thread.sleep(LOCK_RETRY_DELAY);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Bị interrupt khi chờ khoá version template", e);
+    }
   }
 
   /**
