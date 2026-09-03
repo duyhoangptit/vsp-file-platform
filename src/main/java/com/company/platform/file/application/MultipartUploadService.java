@@ -7,8 +7,11 @@ import com.company.platform.file.domain.FileCategory;
 import com.company.platform.file.domain.FileCategoryNotFoundException;
 import com.company.platform.file.domain.FileCategoryRepository;
 import com.company.platform.file.domain.FileValidationException;
+import com.company.platform.file.domain.FileVerificationFailedException;
+import com.company.platform.file.domain.InvalidFileAssetStateException;
 import com.company.platform.file.domain.InvalidPartNumberException;
 import com.company.platform.file.domain.MultipartNotEnabledException;
+import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.file.storage.MinioStorageService;
 import com.company.platform.file.storage.multipart.MultipartStorageService;
 import java.time.Duration;
@@ -28,16 +31,19 @@ public class MultipartUploadService {
   private final FileAssetRepository fileAssetRepository;
   private final MinioStorageService minioStorageService;
   private final MultipartStorageService multipartStorageService;
+  private final FileAssetStatusFinalizer fileAssetStatusFinalizer;
 
   public MultipartUploadService(
       FileCategoryRepository fileCategoryRepository,
       FileAssetRepository fileAssetRepository,
       MinioStorageService minioStorageService,
-      MultipartStorageService multipartStorageService) {
+      MultipartStorageService multipartStorageService,
+      FileAssetStatusFinalizer fileAssetStatusFinalizer) {
     this.fileCategoryRepository = fileCategoryRepository;
     this.fileAssetRepository = fileAssetRepository;
     this.minioStorageService = minioStorageService;
     this.multipartStorageService = multipartStorageService;
+    this.fileAssetStatusFinalizer = fileAssetStatusFinalizer;
   }
 
   @Transactional
@@ -118,6 +124,90 @@ public class MultipartUploadService {
               return new PartUrl(n, url, expiresAt);
             })
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<MultipartStorageService.UploadedPart> listUploadedParts(UUID fileAssetId) {
+    FileAsset asset = requireOpenMultipart(fileAssetId);
+    return multipartStorageService.listParts(
+        asset.getBucketName(), asset.getObjectKey(), asset.getMultipartUploadId());
+  }
+
+  @Transactional
+  public FileAsset completeMultipart(CompleteMultipartUploadCommand cmd) {
+    FileAsset asset =
+        fileAssetRepository
+            .findById(cmd.fileAssetId())
+            .orElseThrow(() -> new FileAssetNotFoundException(cmd.fileAssetId()));
+    if (asset.getStorageStatus() == StorageStatus.CLEAN) {
+      return asset; // idempotent
+    }
+    String uploadId = asset.getMultipartUploadId();
+    if (uploadId == null) {
+      throw new InvalidFileAssetStateException(cmd.fileAssetId(), asset.getStorageStatus());
+    }
+    FileCategory category =
+        fileCategoryRepository
+            .findById(asset.getCategoryCode())
+            .orElseThrow(() -> new FileCategoryNotFoundException(asset.getCategoryCode()));
+
+    multipartStorageService.completeMultipartUpload(
+        asset.getBucketName(),
+        asset.getObjectKey(),
+        uploadId,
+        cmd.parts().stream()
+            .map(p -> new MultipartStorageService.CompletedPartRef(p.partNumber(), p.etag()))
+            .toList());
+
+    long realSize =
+        minioStorageService
+            .statObject(asset.getBucketName(), asset.getObjectKey())
+            .orElseThrow(
+                () ->
+                    new FileVerificationFailedException(
+                        asset.getId(), "object không tồn tại sau khi complete multipart"))
+            .size();
+    if (realSize > category.getMaxSizeBytes()) {
+      multipartStorageService.abortMultipartUpload(
+          asset.getBucketName(), asset.getObjectKey(), uploadId);
+      fileAssetRepository.softDelete(asset.getId(), Instant.now());
+      fileAssetRepository.clearMultipartUploadId(asset.getId(), Instant.now());
+      throw new FileVerificationFailedException(
+          asset.getId(),
+          "kích thước %d vượt trần %d của category"
+              .formatted(realSize, category.getMaxSizeBytes()));
+    }
+
+    fileAssetRepository.updateSizeBytes(asset.getId(), realSize, Instant.now());
+    FileAsset clean = fileAssetStatusFinalizer.finalizeToClean(asset.getId(), cmd.checksumSha256());
+    fileAssetRepository.clearMultipartUploadId(asset.getId(), Instant.now());
+    return clean;
+  }
+
+  @Transactional
+  public void abortMultipart(UUID fileAssetId) {
+    FileAsset asset =
+        fileAssetRepository
+            .findById(fileAssetId)
+            .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    String uploadId = asset.getMultipartUploadId();
+    if (uploadId != null) {
+      multipartStorageService.abortMultipartUpload(
+          asset.getBucketName(), asset.getObjectKey(), uploadId);
+    }
+    fileAssetRepository.softDelete(fileAssetId, Instant.now());
+    fileAssetRepository.clearMultipartUploadId(fileAssetId, Instant.now());
+  }
+
+  private FileAsset requireOpenMultipart(UUID fileAssetId) {
+    FileAsset asset =
+        fileAssetRepository
+            .findById(fileAssetId)
+            .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    if (asset.getMultipartUploadId() == null) {
+      throw new InvalidFileAssetStateException(fileAssetId, asset.getStorageStatus());
+    }
+    return asset;
   }
 
   private int maxParts(FileCategory category, long partSize) {

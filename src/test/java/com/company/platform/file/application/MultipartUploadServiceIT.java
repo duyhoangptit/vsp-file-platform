@@ -7,9 +7,15 @@ import com.company.platform.file.domain.FileAsset;
 import com.company.platform.file.domain.FileAssetRepository;
 import com.company.platform.file.domain.FileCategory;
 import com.company.platform.file.domain.FileCategoryRepository;
+import com.company.platform.file.domain.FileVerificationFailedException;
 import com.company.platform.file.domain.InvalidPartNumberException;
 import com.company.platform.file.domain.MultipartNotEnabledException;
 import com.company.platform.file.domain.StorageStatus;
+import com.company.platform.file.storage.multipart.MultipartStorageService;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,15 +50,31 @@ class MultipartUploadServiceIT {
   @Autowired MultipartUploadService service;
   @Autowired FileCategoryRepository categoryRepository;
   @Autowired FileAssetRepository assetRepository;
+  @Autowired MultipartStorageService storage;
+
+  private final HttpClient http = HttpClient.newHttpClient();
 
   private String mpCategory;
   private String plainCategory;
+  private String oversizeCategory;
+
+  private String putPart(String url, byte[] body) throws Exception {
+    var resp =
+        http.send(
+            HttpRequest.newBuilder(URI.create(url))
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(body))
+                .build(),
+            HttpResponse.BodyHandlers.discarding());
+    assertThat(resp.statusCode()).isEqualTo(200);
+    return resp.headers().firstValue("ETag").orElseThrow();
+  }
 
   @BeforeEach
   void seed() {
     String s = UUID.randomUUID().toString().substring(0, 8);
     mpCategory = "MP_" + s;
     plainCategory = "PLAIN_" + s;
+    oversizeCategory = "OVER_" + s;
     categoryRepository.save(
         new FileCategory(
             mpCategory,
@@ -73,6 +95,16 @@ class MultipartUploadServiceIT {
             false,
             null,
             null));
+    categoryRepository.save(
+        new FileCategory(
+            oversizeCategory,
+            "over-" + s,
+            List.of("text/csv"),
+            1_000L,
+            false,
+            false,
+            null,
+            6L * 1024 * 1024));
   }
 
   private InitiateMultipartUploadCommand cmd(String category) {
@@ -113,5 +145,97 @@ class MultipartUploadServiceIT {
 
     assertThatThrownBy(() -> service.generatePartUrls(init.fileAssetId(), List.of(9)))
         .isInstanceOf(InvalidPartNumberException.class);
+  }
+
+  @Test
+  void should_transitionToClean_when_completeAfterUploadingParts() throws Exception {
+    MultipartUploadInitiation init = service.initiateMultipart(cmd(mpCategory));
+    byte[] p1 = new byte[6 * 1024 * 1024];
+    byte[] p2 = "tail".getBytes();
+    List<PartUrl> urls = service.generatePartUrls(init.fileAssetId(), List.of(1, 2));
+    String e1 = putPart(urls.get(0).url(), p1);
+    String e2 = putPart(urls.get(1).url(), p2);
+
+    FileAsset done =
+        service.completeMultipart(
+            new CompleteMultipartUploadCommand(
+                init.fileAssetId(),
+                List.of(
+                    new CompleteMultipartUploadCommand.PartRef(1, e1),
+                    new CompleteMultipartUploadCommand.PartRef(2, e2)),
+                "cafe"));
+
+    assertThat(done.getStorageStatus()).isEqualTo(StorageStatus.CLEAN);
+    assertThat(done.getSizeBytes()).isEqualTo((long) p1.length + p2.length);
+    assertThat(done.getChecksumSha256()).isEqualTo("cafe");
+    assertThat(assetRepository.findById(init.fileAssetId()).orElseThrow().getMultipartUploadId())
+        .isNull();
+  }
+
+  @Test
+  void should_listUploadedParts_when_someUploaded() throws Exception {
+    MultipartUploadInitiation init = service.initiateMultipart(cmd(mpCategory));
+    byte[] p1 = new byte[6 * 1024 * 1024];
+    String etag =
+        putPart(service.generatePartUrls(init.fileAssetId(), List.of(1)).get(0).url(), p1);
+
+    List<MultipartStorageService.UploadedPart> parts =
+        service.listUploadedParts(init.fileAssetId());
+
+    assertThat(parts)
+        .extracting(MultipartStorageService.UploadedPart::partNumber)
+        .containsExactly(1);
+    assertThat(parts.get(0).sizeBytes()).isEqualTo(p1.length);
+    assertThat(parts.get(0).etag()).isEqualTo(etag);
+  }
+
+  @Test
+  void should_rejectListUploadedParts_when_noOpenUpload() {
+    MultipartUploadInitiation init = service.initiateMultipart(cmd(mpCategory));
+    service.abortMultipart(init.fileAssetId());
+
+    assertThatThrownBy(() -> service.listUploadedParts(init.fileAssetId()))
+        .isInstanceOf(com.company.platform.file.domain.InvalidFileAssetStateException.class);
+  }
+
+  @Test
+  void should_softDeleteAsset_when_abort() {
+    MultipartUploadInitiation init = service.initiateMultipart(cmd(mpCategory));
+
+    service.abortMultipart(init.fileAssetId());
+
+    FileAsset asset = assetRepository.findById(init.fileAssetId()).orElseThrow();
+    assertThat(asset.getDeletedAt()).isNotNull();
+    assertThat(asset.getMultipartUploadId()).isNull();
+  }
+
+  @Test
+  void should_beIdempotent_when_abortCalledTwice() {
+    MultipartUploadInitiation init = service.initiateMultipart(cmd(mpCategory));
+
+    service.abortMultipart(init.fileAssetId());
+    service.abortMultipart(init.fileAssetId());
+
+    assertThat(assetRepository.findById(init.fileAssetId()).orElseThrow().getMultipartUploadId())
+        .isNull();
+  }
+
+  @Test
+  void should_rejectAndNotReachClean_when_completedObjectExceedsCategoryMax() throws Exception {
+    MultipartUploadInitiation init = service.initiateMultipart(cmd(oversizeCategory));
+    byte[] p1 = new byte[6 * 1024 * 1024];
+    String e1 = putPart(service.generatePartUrls(init.fileAssetId(), List.of(1)).get(0).url(), p1);
+
+    assertThatThrownBy(
+            () ->
+                service.completeMultipart(
+                    new CompleteMultipartUploadCommand(
+                        init.fileAssetId(),
+                        List.of(new CompleteMultipartUploadCommand.PartRef(1, e1)),
+                        "cafe")))
+        .isInstanceOf(FileVerificationFailedException.class);
+
+    assertThat(assetRepository.findById(init.fileAssetId()).orElseThrow().getStorageStatus())
+        .isNotEqualTo(StorageStatus.CLEAN);
   }
 }

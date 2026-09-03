@@ -60,4 +60,10 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, UUID> {
           + "WHERE f.id = :id AND f.storageStatus = com.company.platform.file.domain.StorageStatus.UPLOADING")
   int updateSizeBytes(
       @Param("id") UUID id, @Param("sizeBytes") long sizeBytes, @Param("now") Instant now);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "UPDATE FileAsset f SET f.deletedAt = :now, f.updatedAt = :now "
+          + "WHERE f.id = :id AND f.deletedAt IS NULL")
+  int softDelete(@Param("id") UUID id, @Param("now") Instant now);
 }
