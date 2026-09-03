@@ -1,12 +1,12 @@
 package com.company.platform.file.api;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.hamcrest.Matchers.allOf;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -89,7 +89,10 @@ class FileInternalDownloadControllerTest {
     when(fileDownloadService.prepareBytesDownload(fileAssetId))
         .thenReturn(
             new FileBytesResult(
-                new ByteArrayInputStream(fileContent), "report.csv", "text/csv", fileContent.length));
+                new ByteArrayInputStream(fileContent),
+                "report.csv",
+                "text/csv",
+                fileContent.length));
 
     mockMvc
         .perform(get("/api/internal/files/" + fileAssetId + "/bytes").header(HEADER, CORRECT_KEY))
@@ -99,8 +102,7 @@ class FileInternalDownloadControllerTest {
             header()
                 .string(
                     "Content-Disposition",
-                    allOf(
-                        containsString("attachment"), containsString("filename=\"report.csv\""))))
+                    allOf(containsString("attachment"), containsString("filename=\"report.csv\""))))
         .andExpect(content().bytes(fileContent));
   }
 

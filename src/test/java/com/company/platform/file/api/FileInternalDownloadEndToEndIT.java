@@ -61,7 +61,8 @@ class FileInternalDownloadEndToEndIT {
   @Autowired private MockMvc mockMvc;
   @Autowired private FileCategoryRepository fileCategoryRepository;
 
-  private static final byte[] FILE_CONTENT = "hello internal bytes".getBytes(StandardCharsets.UTF_8);
+  private static final byte[] FILE_CONTENT =
+      "hello internal bytes".getBytes(StandardCharsets.UTF_8);
   private static final String CORRECT_KEY = "it-test-internal-api-key";
   private final ObjectMapper objectMapper = new ObjectMapper();
 

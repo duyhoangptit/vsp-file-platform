@@ -53,11 +53,11 @@ public class FileDownloadService {
   }
 
   /**
-   * Đọc trực tiếp nội dung byte của file — dành cho API internal (song song với
-   * {@link #generateDownloadUrl}, xem design doc 2026-08-08-internal-download-bytes-api-design.md).
-   * Caller (Controller) chịu trách nhiệm close() {@code InputStream} trả về. Giữ nguyên bất biến
-   * chỉ đọc được khi storage_status = CLEAN, nhất quán với presigned URL. Ghi audit tường minh vì
-   * đường này không đi qua {@code @RequiresAccess}/{@code ResourceAccessAuditAspect}.
+   * Đọc trực tiếp nội dung byte của file — dành cho API internal (song song với {@link
+   * #generateDownloadUrl}, xem design doc 2026-08-08-internal-download-bytes-api-design.md). Caller
+   * (Controller) chịu trách nhiệm close() {@code InputStream} trả về. Giữ nguyên bất biến chỉ đọc
+   * được khi storage_status = CLEAN, nhất quán với presigned URL. Ghi audit tường minh vì đường này
+   * không đi qua {@code @RequiresAccess}/{@code ResourceAccessAuditAspect}.
    */
   public FileBytesResult prepareBytesDownload(UUID fileAssetId) {
     FileAsset fileAsset = requireCleanFileAsset(fileAssetId);
@@ -70,7 +70,10 @@ public class FileDownloadService {
         fileAssetId,
         AuditResult.SUCCESS);
     return new FileBytesResult(
-        content, fileAsset.getOriginalFilename(), fileAsset.getMimeType(), fileAsset.getSizeBytes());
+        content,
+        fileAsset.getOriginalFilename(),
+        fileAsset.getMimeType(),
+        fileAsset.getSizeBytes());
   }
 
   private FileAsset requireCleanFileAsset(UUID fileAssetId) {
