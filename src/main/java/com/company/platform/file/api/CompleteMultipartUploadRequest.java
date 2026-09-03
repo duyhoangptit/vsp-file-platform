@@ -15,8 +15,7 @@ public record CompleteMultipartUploadRequest(
                 "Danh sách part đã upload (số part + ETag do MinIO trả về lúc PUT part) — server"
                     + " gộp thành object hoàn chỉnh theo thứ tự partNumber.")
         @NotEmpty
-        @Valid
-        List<PartInput> parts,
+        List<@Valid PartInput> parts,
     @Schema(
             description = "SHA-256 checksum client tự tính trên toàn bộ file gốc.",
             example = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
