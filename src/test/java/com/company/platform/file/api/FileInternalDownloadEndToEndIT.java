@@ -80,6 +80,7 @@ class FileInternalDownloadEndToEndIT {
             1_000_000L,
             false,
             true,
+            null,
             null));
   }
 

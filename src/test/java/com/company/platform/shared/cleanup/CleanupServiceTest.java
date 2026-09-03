@@ -53,10 +53,18 @@ class CleanupServiceTest {
   void should_softDeleteExpiredFileAssetsForEachCategoryWithRetention_when_lockAcquired() {
     when(advisoryLockService.tryLock(anyLong())).thenReturn(true);
     FileCategory categoryA =
-        new FileCategory("AVATAR", "avatar-bucket", List.of("image/png"), 1024, false, false, 7);
+        new FileCategory(
+            "AVATAR", "avatar-bucket", List.of("image/png"), 1024, false, false, 7, null);
     FileCategory categoryB =
         new FileCategory(
-            "EXPORT_RESULT", "export-results", List.of("text/csv"), 52428800, false, false, 14);
+            "EXPORT_RESULT",
+            "export-results",
+            List.of("text/csv"),
+            52428800,
+            false,
+            false,
+            14,
+            null);
     when(fileCategoryRepository.findAllByRetentionDaysIsNotNull())
         .thenReturn(List.of(categoryA, categoryB));
 

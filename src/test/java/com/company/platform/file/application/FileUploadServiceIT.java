@@ -73,6 +73,7 @@ class FileUploadServiceIT {
             1_000_000L,
             false,
             true,
+            null,
             null));
   }
 

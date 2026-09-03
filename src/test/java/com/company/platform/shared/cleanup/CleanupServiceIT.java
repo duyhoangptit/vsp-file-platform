@@ -135,7 +135,7 @@ class CleanupServiceIT {
   private FileCategory seedCategory(String code, int retentionDays) {
     FileCategory category =
         new FileCategory(
-            code, "bucket-" + code, List.of("text/csv"), 1024, false, false, retentionDays);
+            code, "bucket-" + code, List.of("text/csv"), 1024, false, false, retentionDays, null);
     return fileCategoryRepository.save(category);
   }
 

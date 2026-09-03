@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-1-add-multipart-part-size-to-file-categories
+      author: platform
+      changes:
+        - addColumn:
+            tableName: file_categories
+            columns:
+              - column:
+                  name: multipart_part_size_bytes
+                  type: BIGINT
+  - changeSet:
+      id: 011-2-add-multipart-upload-id-to-file-assets
+      author: platform
+      changes:
+        - addColumn:
+            tableName: file_assets
+            columns:
+              - column:
+                  name: multipart_upload_id
+                  type: VARCHAR

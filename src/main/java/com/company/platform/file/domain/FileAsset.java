@@ -70,6 +70,9 @@ public class FileAsset {
   @Column(name = "deleted_at")
   private Instant deletedAt;
 
+  @Column(name = "multipart_upload_id")
+  private String multipartUploadId;
+
   protected FileAsset() {}
 
   public FileAsset(
@@ -129,5 +132,15 @@ public class FileAsset {
         uploadedBy,
         expiresAt);
     this.jobId = jobId;
+  }
+
+  public void attachMultipartUpload(String uploadId) {
+    this.multipartUploadId = uploadId;
+    this.updatedAt = Instant.now();
+  }
+
+  public void clearMultipartUpload() {
+    this.multipartUploadId = null;
+    this.updatedAt = Instant.now();
   }
 }
