@@ -241,6 +241,90 @@ Message trên queue chỉ để "đánh thức" consumer đi query DB — quyề
 - Download: API check `ResourceAuthorizationService` trước → nếu pass, sinh presigned GET URL có thời hạn ngắn (15-30 phút), chỉ khi `storage_status='CLEAN'`.
 - Object key = UUID, không dùng tên file gốc → tránh đè file, tránh lộ thông tin qua URL.
 
+### 8.1. Multipart upload cho file lớn (API tách biệt)
+
+Luồng presigned PUT đơn ở trên giữ nguyên cho file nhỏ. Với file lớn (cần upload
+song song / resume / vượt 5 GiB của single PUT) có thêm **một bộ API riêng**,
+không đụng vào `initiateUpload`/`confirmUpload` hiện có.
+
+**Nguyên tắc:**
+
+- **State machine `file_assets` không đổi.** Multipart chỉ là cách "đổ bytes" vào
+  object; vẫn `UPLOADING → UPLOADED_DMZ → CLEAN` qua đúng chuỗi CAS như
+  `confirmUpload`. Luồng download, presigned GET, retention không đổi.
+- **Client KHÔNG khai `sizeBytes`.** Backend không cần và không tin size từ
+  client. Part size do backend quyết theo config; kiểm tra `max_size_bytes` làm ở
+  bước `complete` dựa trên size thật của object (`statObject`).
+- **Object ETag của file multipart KHÔNG phải MD5 cả file** (`md5(concat part-md5)-N`)
+  → không dùng ETag làm integrity check. Vẫn dùng client SHA-256 + size thật như
+  luồng đơn.
+- Object key vẫn là UUID. Presigned part URL chỉ là "kênh vận chuyển", quyền vẫn
+  check ở tầng API (`@RequiresAccess(FILE_ASSET, WRITE)` cho complete/abort/part-urls;
+  initiate không cần vì chưa có resource — giống `initiateUpload`).
+
+**Config (`file_categories`, mục 12 — để config không hardcode):**
+
+- `multipart_part_size_bytes BIGINT NULL` — có giá trị = category này bật
+  multipart; `NULL` = không hỗ trợ (initiate multipart trả lỗi). Là size mỗi part
+  backend yêu cầu client cắt (trừ part cuối). Phải ≥ 5 MiB (giới hạn S3/MinIO cho
+  part không phải part cuối).
+- `max_size_bytes` (đã có) = trần, kiểm ở `complete`.
+
+**Cột thêm trên `file_assets`:**
+
+- `multipart_upload_id VARCHAR NULL` — S3 uploadId của phiên multipart đang mở;
+  set NULL sau khi `complete`/`abort`. Dùng cho resume + cleanup.
+
+**API (`/api/files/multipart`):**
+
+1. `POST /api/files/multipart` — initiate. Body: `categoryCode, originalFilename,
+   mimeType, ownerType` (không size). Backend: validate mime, category phải có
+   `multipart_part_size_bytes`; tạo `file_assets` (UPLOADING, `size_bytes = 0`
+   tạm), gọi `CreateMultipartUpload`, lưu `multipart_upload_id`. Trả
+   `{ fileAssetId, partSizeBytes, maxParts }` với
+   `maxParts = ceil(max_size_bytes / partSizeBytes)`.
+2. `POST /api/files/multipart/{fileAssetId}/part-urls` — body `{ partNumbers: [int] }`.
+   Trả `{ urls: [{ partNumber, url, expiresAt }] }`, mỗi url là presigned PUT cho
+   `UploadPart`. Backend từ chối `partNumber < 1` hoặc `> min(maxParts, 10000)`.
+   Client gọi lại endpoint này để lấy URL mới khi URL cũ hết hạn (resume) — FE tự
+   quyết chia lô bao nhiêu part/lần.
+3. `GET /api/files/multipart/{fileAssetId}/parts` — resume helper. Backend
+   `ListParts` từ storage → trả `[{ partNumber, etag, sizeBytes }]` các part đã
+   upload xong, để client chỉ upload lại phần thiếu.
+4. `POST /api/files/multipart/{fileAssetId}/complete` — body
+   `{ parts: [{ partNumber, etag }], checksumSha256 }`. Backend:
+   `CompleteMultipartUpload` → `statObject` lấy size thật → nếu `> max_size_bytes`:
+   `AbortMultipartUpload` + fail (422). Ngược lại: cập nhật `size_bytes` thật, CAS
+   `UPLOADING → UPLOADED_DMZ`, verify (HEAD, size), CAS `UPLOADED_DMZ → CLEAN` +
+   lưu checksum, xoá `multipart_upload_id`. Idempotent nếu đã CLEAN.
+5. `POST /api/files/multipart/{fileAssetId}/abort` — `AbortMultipartUpload` +
+   soft-delete `file_assets` (`deleted_at`) + xoá `multipart_upload_id`.
+
+**Cleanup phiên dở dang (mục 10):**
+
+- Cơ chế chính: `CleanupService` quét thêm `file_assets` còn
+  `storage_status = 'UPLOADING'` và `multipart_upload_id IS NOT NULL` quá
+  `created_at + config` → `AbortMultipartUpload` + soft-delete metadata.
+- (Follow-up, không thuộc v1) Bucket lifecycle rule
+  `AbortIncompleteMultipartUpload` như lưới an toàn thứ 2 ở tầng storage — hoãn vì
+  đụng contract `ensureBucketExists` và test retention hiện có.
+
+**Storage SDK — vì sao thêm AWS SDK v2:**
+
+MinIO Java SDK 9.0.0 **không expose** `CreateMultipartUpload`/`CompleteMultipartUpload`/
+`AbortMultipartUpload`/`ListParts` ở API công khai (các method này `private` trong
+`MinioAsyncClient`, class `S3Base` của 8.x đã bị bỏ). MinIO S3-compatible nên
+dùng `software.amazon.awssdk:s3` (`S3Client` cho lifecycle, `S3Presigner` cho part
+URL — presigner không gọi mạng) trỏ vào cùng endpoint/credentials MinIO.
+
+- `MinioClient` + `MinioStorageService` hiện tại **giữ nguyên** cho mọi thứ khác
+  (bucket, lifecycle rule, presign đơn, `statObject`, `getObject`, `uploadObject`).
+- AWS SDK chỉ xuất hiện trong package `file/storage/multipart/`. Cấu hình bắt buộc
+  khi trỏ vào MinIO: `pathStyleAccessEnabled(true)`, `endpointOverride`, `region`
+  cố định (MinIO bỏ qua nhưng SigV4 cần), tắt checksum mặc định của SDK
+  (`requestChecksumCalculation = WHEN_REQUIRED`) để không vỡ chữ ký presigned.
+- Dựng client từ chính `app.minio.*` properties, không thêm key config.
+
 ---
 
 ## 9. Authorization
