@@ -221,10 +221,12 @@ class MultipartUploadServiceIT {
   }
 
   @Test
-  void should_rejectAndNotReachClean_when_completedObjectExceedsCategoryMax() throws Exception {
+  void should_rejectAndAbort_when_uploadedPartsExceedCategoryMax() throws Exception {
     MultipartUploadInitiation init = service.initiateMultipart(cmd(oversizeCategory));
     byte[] p1 = new byte[6 * 1024 * 1024];
     String e1 = putPart(service.generatePartUrls(init.fileAssetId(), List.of(1)).get(0).url(), p1);
+    FileAsset before = assetRepository.findById(init.fileAssetId()).orElseThrow();
+    String uploadId = before.getMultipartUploadId();
 
     assertThatThrownBy(
             () ->
@@ -235,7 +237,12 @@ class MultipartUploadServiceIT {
                         "cafe")))
         .isInstanceOf(FileVerificationFailedException.class);
 
-    assertThat(assetRepository.findById(init.fileAssetId()).orElseThrow().getStorageStatus())
-        .isNotEqualTo(StorageStatus.CLEAN);
+    // not CLEAN, and row NOT soft-deleted (dangling uploadId is intentional — Task 9 sweep is the
+    // net)
+    FileAsset after = assetRepository.findById(init.fileAssetId()).orElseThrow();
+    assertThat(after.getStorageStatus()).isNotEqualTo(StorageStatus.CLEAN);
+    // multipart session was aborted before completing — no object created, listParts empty
+    assertThat(storage.listParts(before.getBucketName(), before.getObjectKey(), uploadId))
+        .isEmpty();
   }
 }

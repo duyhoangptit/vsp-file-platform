@@ -17,7 +17,9 @@ import com.company.platform.file.storage.multipart.MultipartStorageService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -151,6 +153,30 @@ public class MultipartUploadService {
             .findById(asset.getCategoryCode())
             .orElseThrow(() -> new FileCategoryNotFoundException(asset.getCategoryCode()));
 
+    // Xác thực kích thước TRƯỚC khi complete: nếu để S3 complete xong mới stat thì object vượt
+    // trần đã nằm vĩnh viễn trong bucket (không lifecycle rule nếu category không có retention) và
+    // abort sau complete là no-op. Tổng size lấy từ listParts — S3 đảm bảo size object sau complete
+    // bằng tổng size các part.
+    List<MultipartStorageService.UploadedPart> uploadedParts =
+        multipartStorageService.listParts(asset.getBucketName(), asset.getObjectKey(), uploadId);
+    Set<Integer> requestedPartNumbers =
+        cmd.parts().stream()
+            .map(CompleteMultipartUploadCommand.PartRef::partNumber)
+            .collect(Collectors.toSet());
+    long totalSize =
+        uploadedParts.stream()
+            .filter(p -> requestedPartNumbers.contains(p.partNumber()))
+            .mapToLong(MultipartStorageService.UploadedPart::sizeBytes)
+            .sum();
+    if (totalSize > category.getMaxSizeBytes()) {
+      multipartStorageService.abortMultipartUpload(
+          asset.getBucketName(), asset.getObjectKey(), uploadId);
+      throw new FileVerificationFailedException(
+          asset.getId(),
+          "kích thước %d vượt trần %d của category"
+              .formatted(totalSize, category.getMaxSizeBytes()));
+    }
+
     multipartStorageService.completeMultipartUpload(
         asset.getBucketName(),
         asset.getObjectKey(),
@@ -159,26 +185,7 @@ public class MultipartUploadService {
             .map(p -> new MultipartStorageService.CompletedPartRef(p.partNumber(), p.etag()))
             .toList());
 
-    long realSize =
-        minioStorageService
-            .statObject(asset.getBucketName(), asset.getObjectKey())
-            .orElseThrow(
-                () ->
-                    new FileVerificationFailedException(
-                        asset.getId(), "object không tồn tại sau khi complete multipart"))
-            .size();
-    if (realSize > category.getMaxSizeBytes()) {
-      multipartStorageService.abortMultipartUpload(
-          asset.getBucketName(), asset.getObjectKey(), uploadId);
-      fileAssetRepository.softDelete(asset.getId(), Instant.now());
-      fileAssetRepository.clearMultipartUploadId(asset.getId(), Instant.now());
-      throw new FileVerificationFailedException(
-          asset.getId(),
-          "kích thước %d vượt trần %d của category"
-              .formatted(realSize, category.getMaxSizeBytes()));
-    }
-
-    fileAssetRepository.updateSizeBytes(asset.getId(), realSize, Instant.now());
+    fileAssetRepository.updateSizeBytes(asset.getId(), totalSize, Instant.now());
     FileAsset clean = fileAssetStatusFinalizer.finalizeToClean(asset.getId(), cmd.checksumSha256());
     fileAssetRepository.clearMultipartUploadId(asset.getId(), Instant.now());
     return clean;
