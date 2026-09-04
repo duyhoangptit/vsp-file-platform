@@ -66,4 +66,16 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, UUID> {
       "UPDATE FileAsset f SET f.deletedAt = :now, f.updatedAt = :now "
           + "WHERE f.id = :id AND f.deletedAt IS NULL")
   int softDelete(@Param("id") UUID id, @Param("now") Instant now);
+
+  // Native SQL vì cần LIMIT (JPQL không hỗ trợ) — các phiên multipart còn mở (storage_status
+  // vẫn UPLOADING, multipart_upload_id chưa xoá) mà quá cũ → CleanupService AbortMultipartUpload
+  // + soft-delete metadata (mục 8.1 design doc). Bounded batchSize/lần, tick sau dọn tiếp.
+  @Query(
+      value =
+          "SELECT * FROM file_assets WHERE storage_status = 'UPLOADING' "
+              + "AND multipart_upload_id IS NOT NULL AND deleted_at IS NULL "
+              + "AND created_at < :createdBefore ORDER BY created_at LIMIT :limit",
+      nativeQuery = true)
+  java.util.List<FileAsset> findStaleMultipartUploads(
+      @Param("createdBefore") Instant createdBefore, @Param("limit") int limit);
 }

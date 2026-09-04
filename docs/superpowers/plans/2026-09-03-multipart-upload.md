@@ -1826,7 +1826,7 @@ EOF
   - `CleanupProperties(Duration interval, int batchSize, Duration jobDoneRetention, Duration multipartUploadTimeout)`
   - `CleanupService#runCleanup()` also calls `abortStaleMultipartUploads()`.
 
-- [ ] **Step 1: Write the failing test (extend `CleanupServiceIT`)**
+- [x] **Step 1: Write the failing test (extend `CleanupServiceIT`)**
 
 ```java
   @Test
@@ -1841,12 +1841,12 @@ EOF
 
 Wire the IT with `@Autowired MultipartUploadService`, `MultipartStorageService`, and set `app.cleanup.multipart-upload-timeout=1s` via `@DynamicPropertySource` or `@TestPropertySource` so the back-dating window is tiny.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `mvn test -Dtest=CleanupServiceIT`
 Expected: FAIL — method + config missing.
 
-- [ ] **Step 3: Add repo query**
+- [x] **Step 3: Add repo query**
 
 ```java
   @Query(
@@ -1859,7 +1859,7 @@ Expected: FAIL — method + config missing.
       @Param("createdBefore") Instant createdBefore, @Param("limit") int limit);
 ```
 
-- [ ] **Step 4: Extend `CleanupProperties` + `application.yml`**
+- [x] **Step 4: Extend `CleanupProperties` + `application.yml`**
 
 ```java
 public record CleanupProperties(
@@ -1874,7 +1874,7 @@ public record CleanupProperties(
 
 Update `CleanupServiceTest` / `CleanupSchedulerTest` `new CleanupProperties(...)` to the 4-arg form (`, Duration.ofHours(2)`).
 
-- [ ] **Step 5: Extend `CleanupService`**
+- [x] **Step 5: Extend `CleanupService`**
 
 Add `MultipartStorageService multipartStorageService` as a constructor param (update `CleanupServiceTest`'s `new CleanupService(...)` accordingly, passing a Mockito mock). Then:
 
@@ -1908,7 +1908,7 @@ Add `MultipartStorageService multipartStorageService` as a constructor param (up
 
 Add imports: `FileAsset`.
 
-- [ ] **Step 6: Update `CLAUDE.md`**
+- [x] **Step 6: Update `CLAUDE.md`**
 
 In the "Cấu trúc thư mục" `file/` block, add under `storage/`:
 
@@ -1917,17 +1917,17 @@ In the "Cấu trúc thư mục" `file/` block, add under `storage/`:
 │   │   └── multipart/         # AWS SDK v2 S3 client + MultipartStorageService (luồng multipart)
 ```
 
-- [ ] **Step 7: Run to verify pass**
+- [x] **Step 7: Run to verify pass**
 
 Run: `mvn spotless:apply && mvn test -Dtest='CleanupServiceIT,CleanupServiceTest,CleanupSchedulerTest'`
 Expected: PASS.
 
-- [ ] **Step 8: Full build**
+- [x] **Step 8: Full build**
 
 Run: `mvn clean install` then `mvn verify -Pintegration-test`
 Expected: BUILD SUCCESS, all tests green, Spotless clean.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A

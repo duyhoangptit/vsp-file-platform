@@ -49,6 +49,7 @@ src/main/java/com/company/platform/
 │   ├── api/                # Controller, Request/Response DTO
 │   ├── domain/              # FileAsset, FileCategory (entity + repository interface)
 │   ├── storage/              # MinioStorageService, PresignedUrlService
+│   │   └── multipart/         # AWS SDK v2 S3 client + MultipartStorageService (luồng multipart)
 │   ├── application/           # FileUploadService, FileDownloadService (use case)
 │   └── internal/               # impl chi tiết, package-private, không expose
 │

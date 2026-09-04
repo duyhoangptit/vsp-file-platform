@@ -112,6 +112,9 @@ app:
     interval: ${APP_CLEANUP_INTERVAL:15m}
     batch-size: ${APP_CLEANUP_BATCH_SIZE:500}
     job-done-retention: ${APP_CLEANUP_JOB_DONE_RETENTION:30d}
+    # Phiên multipart mở quá lâu (client bỏ dở) — CleanupService gọi AbortMultipartUpload +
+    # soft-delete metadata (mục 8.1 design doc).
+    multipart-upload-timeout: ${APP_CLEANUP_MULTIPART_UPLOAD_TIMEOUT:2h}
 
 # messaging.provider chọn adapter Kafka/Redis cho JobEventPublisher/Consumer (mục 6.2
 # design doc). Cố tình KHÔNG set ở đây (tắt mặc định) để không ảnh hưởng các test/context
