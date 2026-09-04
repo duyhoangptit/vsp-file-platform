@@ -2,10 +2,14 @@ package com.company.platform.shared.cleanup;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.company.platform.file.application.InitiateMultipartUploadCommand;
+import com.company.platform.file.application.MultipartUploadInitiation;
+import com.company.platform.file.application.MultipartUploadService;
 import com.company.platform.file.domain.FileAsset;
 import com.company.platform.file.domain.FileAssetRepository;
 import com.company.platform.file.domain.FileCategory;
 import com.company.platform.file.domain.FileCategoryRepository;
+import com.company.platform.file.storage.multipart.MultipartStorageService;
 import com.company.platform.job.application.JobStatusService;
 import com.company.platform.job.domain.Job;
 import com.company.platform.job.domain.JobRepository;
@@ -28,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -41,10 +46,17 @@ class CleanupServiceIT {
   @Container @ServiceConnection
   static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine");
 
+  @Container static MinIOContainer minio = new MinIOContainer("minio/minio:latest");
+
   @DynamicPropertySource
   static void cleanupProperties(DynamicPropertyRegistry registry) {
     registry.add("app.cleanup.job-done-retention", () -> "30d");
     registry.add("app.cleanup.batch-size", () -> "500");
+    // Cửa sổ back-date nhỏ để test phiên multipart "quá hạn" mà không phải chờ.
+    registry.add("app.cleanup.multipart-upload-timeout", () -> "1s");
+    registry.add("app.minio.endpoint", minio::getS3URL);
+    registry.add("app.minio.access-key", minio::getUserName);
+    registry.add("app.minio.secret-key", minio::getPassword);
   }
 
   @Autowired private CleanupService cleanupService;
@@ -53,6 +65,8 @@ class CleanupServiceIT {
   @Autowired private FileAssetRepository fileAssetRepository;
   @Autowired private JobRepository jobRepository;
   @Autowired private JobStatusService jobStatusService;
+  @Autowired private MultipartUploadService multipartUploadService;
+  @Autowired private MultipartStorageService multipartStorageService;
   @Autowired private DataSource dataSource;
 
   private Connection heldLockConnection;
@@ -127,6 +141,44 @@ class CleanupServiceIT {
     assertThat(fileAssetRepository.findById(expiredId).orElseThrow().getDeletedAt()).isNotNull();
   }
 
+  @Test
+  void should_abortAndSoftDelete_when_multipartUploadStale() throws Exception {
+    String code = uniqueCategoryCode("MP");
+    String bucketName = "mp-bucket-" + UUID.randomUUID().toString().substring(0, 8);
+    fileCategoryRepository.save(
+        new FileCategory(
+            code,
+            bucketName,
+            List.of("text/csv"),
+            50L * 1024 * 1024,
+            false,
+            false,
+            null,
+            5L * 1024 * 1024));
+    UUID user = UUID.randomUUID();
+    MultipartUploadInitiation init =
+        multipartUploadService.initiateMultipart(
+            new InitiateMultipartUploadCommand(code, "big.csv", "text/csv", "USER", user, user));
+    FileAsset before = fileAssetRepository.findById(init.fileAssetId()).orElseThrow();
+    String bucket = before.getBucketName();
+    String objectKey = before.getObjectKey();
+    String uploadId = before.getMultipartUploadId();
+    assertThat(uploadId).isNotBlank();
+
+    // Back-date created_at rõ ràng quá multipart-upload-timeout (1s) — biên rộng để không phụ
+    // thuộc timezone của session Postgres so với JVM (cùng cách seedDoneJob lùi 31 ngày).
+    execute(
+        "UPDATE file_assets SET created_at = now() - interval '2 days' WHERE id = ?",
+        init.fileAssetId());
+
+    cleanupService.runCleanup();
+
+    FileAsset after = fileAssetRepository.findById(init.fileAssetId()).orElseThrow();
+    assertThat(after.getDeletedAt()).isNotNull();
+    assertThat(after.getMultipartUploadId()).isNull();
+    assertThat(multipartStorageService.listParts(bucket, objectKey, uploadId)).isEmpty();
+  }
+
   // code là VARCHAR(50) — cắt ngắn UUID để không vượt giới hạn cột.
   private String uniqueCategoryCode(String prefix) {
     return prefix + "_" + UUID.randomUUID().toString().substring(0, 8);
@@ -135,7 +187,7 @@ class CleanupServiceIT {
   private FileCategory seedCategory(String code, int retentionDays) {
     FileCategory category =
         new FileCategory(
-            code, "bucket-" + code, List.of("text/csv"), 1024, false, false, retentionDays);
+            code, "bucket-" + code, List.of("text/csv"), 1024, false, false, retentionDays, null);
     return fileCategoryRepository.save(category);
   }
 

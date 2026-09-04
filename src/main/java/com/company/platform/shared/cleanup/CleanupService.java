@@ -1,8 +1,10 @@
 package com.company.platform.shared.cleanup;
 
+import com.company.platform.file.domain.FileAsset;
 import com.company.platform.file.domain.FileAssetRepository;
 import com.company.platform.file.domain.FileCategory;
 import com.company.platform.file.domain.FileCategoryRepository;
+import com.company.platform.file.storage.multipart.MultipartStorageService;
 import com.company.platform.job.domain.JobRepository;
 import com.company.platform.shared.lock.AdvisoryLockService;
 import java.time.Instant;
@@ -26,6 +28,7 @@ public class CleanupService {
   private final FileCategoryRepository fileCategoryRepository;
   private final FileAssetRepository fileAssetRepository;
   private final JobRepository jobRepository;
+  private final MultipartStorageService multipartStorageService;
   private final AdvisoryLockService advisoryLockService;
   private final CleanupProperties properties;
 
@@ -33,11 +36,13 @@ public class CleanupService {
       FileCategoryRepository fileCategoryRepository,
       FileAssetRepository fileAssetRepository,
       JobRepository jobRepository,
+      MultipartStorageService multipartStorageService,
       AdvisoryLockService advisoryLockService,
       CleanupProperties properties) {
     this.fileCategoryRepository = fileCategoryRepository;
     this.fileAssetRepository = fileAssetRepository;
     this.jobRepository = jobRepository;
+    this.multipartStorageService = multipartStorageService;
     this.advisoryLockService = advisoryLockService;
     this.properties = properties;
   }
@@ -50,6 +55,26 @@ public class CleanupService {
     }
     cleanupExpiredFileAssets();
     expireDoneJobs();
+    abortStaleMultipartUploads();
+  }
+
+  // Phiên multipart client bỏ dở (mục 8.1 design doc): abort phía storage để MinIO thu hồi part
+  // đã upload, rồi soft-delete metadata + xoá multipart_upload_id. Nếu abort ném lỗi (upload đã
+  // biến mất phía storage) vẫn dọn metadata bên dưới — không để dòng kẹt UPLOADING mãi.
+  private void abortStaleMultipartUploads() {
+    Instant threshold = Instant.now().minus(properties.multipartUploadTimeout());
+    for (FileAsset asset :
+        fileAssetRepository.findStaleMultipartUploads(threshold, properties.batchSize())) {
+      try {
+        multipartStorageService.abortMultipartUpload(
+            asset.getBucketName(), asset.getObjectKey(), asset.getMultipartUploadId());
+      } catch (RuntimeException e) {
+        // upload đã biến mất phía storage — bỏ qua, vẫn dọn metadata bên dưới.
+      }
+      Instant now = Instant.now();
+      fileAssetRepository.softDelete(asset.getId(), now);
+      fileAssetRepository.clearMultipartUploadId(asset.getId(), now);
+    }
   }
 
   // Mỗi category chỉ xử lý tối đa batchSize dòng/lần gọi — bounded, phần tồn đọng được dọn

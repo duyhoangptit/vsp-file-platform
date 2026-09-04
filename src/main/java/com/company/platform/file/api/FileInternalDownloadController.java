@@ -23,9 +23,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 /**
  * Song song với {@link FileDownloadController#getDownloadUrl} — trả thẳng nội dung byte của file
  * qua HTTP thay vì presigned URL, dành cho service nội bộ gọi server-to-server (không đại diện 1
- * end-user cụ thể). Bảo vệ bởi {@code InternalApiKeyInterceptor} áp cho toàn bộ prefix
- * {@code /api/internal/**} (đăng ký ở InternalApiWebConfig) — cố tình KHÔNG dùng
- * {@code @RequiresAccess} vì không có UserContext đáng tin cậy ở đường gọi này. Xem design doc
+ * end-user cụ thể). Bảo vệ bởi {@code InternalApiKeyInterceptor} áp cho toàn bộ prefix {@code
+ * /api/internal/**} (đăng ký ở InternalApiWebConfig) — cố tình KHÔNG dùng {@code @RequiresAccess}
+ * vì không có UserContext đáng tin cậy ở đường gọi này. Xem design doc
  * 2026-08-08-internal-download-bytes-api-design.md.
  */
 @RestController
@@ -49,8 +49,7 @@ public class FileInternalDownloadController {
   @ApiResponse(
       responseCode = "401",
       description = "Thiếu/sai header X-Internal-Api-Key",
-      content =
-          @Content(schema = @Schema(implementation = AuthExceptionHandler.ApiError.class)))
+      content = @Content(schema = @Schema(implementation = AuthExceptionHandler.ApiError.class)))
   @ApiResponse(
       responseCode = "404",
       description = "Không tìm thấy file asset",

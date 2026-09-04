@@ -30,14 +30,17 @@ public class FileUploadService {
   private final FileCategoryRepository fileCategoryRepository;
   private final FileAssetRepository fileAssetRepository;
   private final MinioStorageService minioStorageService;
+  private final FileAssetStatusFinalizer fileAssetStatusFinalizer;
 
   public FileUploadService(
       FileCategoryRepository fileCategoryRepository,
       FileAssetRepository fileAssetRepository,
-      MinioStorageService minioStorageService) {
+      MinioStorageService minioStorageService,
+      FileAssetStatusFinalizer fileAssetStatusFinalizer) {
     this.fileCategoryRepository = fileCategoryRepository;
     this.fileAssetRepository = fileAssetRepository;
     this.minioStorageService = minioStorageService;
+    this.fileAssetStatusFinalizer = fileAssetStatusFinalizer;
   }
 
   @Transactional
@@ -84,44 +87,7 @@ public class FileUploadService {
    */
   @Transactional
   public FileAsset confirmUpload(UUID fileAssetId, String checksumSha256) {
-    FileAsset fileAsset =
-        fileAssetRepository
-            .findById(fileAssetId)
-            .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
-
-    if (fileAsset.getStorageStatus() == StorageStatus.CLEAN) {
-      return fileAsset;
-    }
-    if (fileAsset.getStorageStatus() != StorageStatus.UPLOADING
-        && fileAsset.getStorageStatus() != StorageStatus.UPLOADED_DMZ) {
-      throw new InvalidFileAssetStateException(fileAssetId, fileAsset.getStorageStatus());
-    }
-
-    if (fileAsset.getStorageStatus() == StorageStatus.UPLOADING) {
-      int updated =
-          fileAssetRepository.casUpdateStorageStatus(
-              fileAssetId, StorageStatus.UPLOADING, StorageStatus.UPLOADED_DMZ, Instant.now());
-      if (updated != 1) {
-        throw new InvalidFileAssetStateException(fileAssetId, fileAsset.getStorageStatus());
-      }
-    }
-
-    verifyUploadedObject(fileAsset);
-
-    int updated =
-        fileAssetRepository.casUpdateStorageStatusWithChecksum(
-            fileAssetId,
-            StorageStatus.UPLOADED_DMZ,
-            StorageStatus.CLEAN,
-            checksumSha256,
-            Instant.now());
-    if (updated != 1) {
-      throw new InvalidFileAssetStateException(fileAssetId, fileAsset.getStorageStatus());
-    }
-
-    return fileAssetRepository
-        .findById(fileAssetId)
-        .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    return fileAssetStatusFinalizer.finalizeToClean(fileAssetId, checksumSha256);
   }
 
   /**

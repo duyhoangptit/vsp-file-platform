@@ -6,6 +6,8 @@ import com.company.platform.file.domain.FileNotAvailableForDownloadException;
 import com.company.platform.file.domain.FileValidationException;
 import com.company.platform.file.domain.FileVerificationFailedException;
 import com.company.platform.file.domain.InvalidFileAssetStateException;
+import com.company.platform.file.domain.InvalidPartNumberException;
+import com.company.platform.file.domain.MultipartNotEnabledException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +46,16 @@ public class FileApiExceptionHandler {
   public ResponseEntity<ApiError> handleNotAvailableForDownload(
       FileNotAvailableForDownloadException e) {
     return error(HttpStatus.CONFLICT, e.getMessage());
+  }
+
+  @ExceptionHandler(MultipartNotEnabledException.class)
+  public ResponseEntity<ApiError> handleMultipartNotEnabled(MultipartNotEnabledException e) {
+    return error(HttpStatus.CONFLICT, e.getMessage());
+  }
+
+  @ExceptionHandler(InvalidPartNumberException.class)
+  public ResponseEntity<ApiError> handleInvalidPartNumber(InvalidPartNumberException e) {
+    return error(HttpStatus.BAD_REQUEST, e.getMessage());
   }
 
   private ResponseEntity<ApiError> error(HttpStatus status, String message) {

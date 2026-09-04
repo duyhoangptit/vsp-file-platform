@@ -36,6 +36,9 @@ public class FileCategory {
   @Column(name = "retention_days")
   private Integer retentionDays;
 
+  @Column(name = "multipart_part_size_bytes")
+  private Long multipartPartSizeBytes;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -51,7 +54,8 @@ public class FileCategory {
       long maxSizeBytes,
       boolean requireVirusScan,
       boolean publicAccess,
-      Integer retentionDays) {
+      Integer retentionDays,
+      Long multipartPartSizeBytes) {
     Instant now = Instant.now();
     this.code = code;
     this.bucketName = bucketName;
@@ -60,6 +64,7 @@ public class FileCategory {
     this.requireVirusScan = requireVirusScan;
     this.publicAccess = publicAccess;
     this.retentionDays = retentionDays;
+    this.multipartPartSizeBytes = multipartPartSizeBytes;
     this.createdAt = now;
     this.updatedAt = now;
   }

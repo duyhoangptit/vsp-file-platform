@@ -23,8 +23,10 @@ public record JobContext(
 
   @FunctionalInterface
   public interface ProgressReporter {
-    // Bất kỳ ai muốn báo cáo tiến độ, hãy đưa cho tôi số lượng công việc đã làm xong (processedUnits), tôi sẽ xử lý nó
-    // long processedUnits: Tham số đầu vào đại diện cho tiến trình hiện tại (ví dụ: số bytes đã tải xong, số dòng code đã đọc, số lượng tệp đã xử lý).
+    // Bất kỳ ai muốn báo cáo tiến độ, hãy đưa cho tôi số lượng công việc đã làm xong
+    // (processedUnits), tôi sẽ xử lý nó
+    // long processedUnits: Tham số đầu vào đại diện cho tiến trình hiện tại (ví dụ: số bytes đã tải
+    // xong, số dòng code đã đọc, số lượng tệp đã xử lý).
     void report(long processedUnits);
   }
 }

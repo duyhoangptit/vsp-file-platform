@@ -15,7 +15,7 @@ class CleanupSchedulerTest {
 
   private final CleanupService cleanupService = mock(CleanupService.class);
   private final CleanupProperties properties =
-      new CleanupProperties(Duration.ofMinutes(15), 500, Duration.ofDays(30));
+      new CleanupProperties(Duration.ofMinutes(15), 500, Duration.ofDays(30), Duration.ofHours(2));
   private final CleanupScheduler scheduler = new CleanupScheduler(cleanupService, properties);
 
   @Test

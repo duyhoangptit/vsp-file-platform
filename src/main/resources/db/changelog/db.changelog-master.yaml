@@ -19,3 +19,5 @@ databaseChangeLog:
       file: db/changelog/changes/009-init-file-template-manager.yaml
   - include:
       file: db/changelog/changes/010-seed-file-category-file-template.yaml
+  - include:
+      file: db/changelog/changes/011-init-multipart-upload.yaml
