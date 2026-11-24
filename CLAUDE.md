@@ -41,16 +41,29 @@ Modular monolith (Spring Boot) quản lý upload/download file và xử lý job 
   `job_type`; phần còn lại của pipeline (Writer, Uploader, status, heartbeat)
   không đổi. Xem thêm mục 7 design doc (Cross-Service Data Access).
 
+- **Admin API `/api/admin/**`** xác thực bằng JWT của vsp-identity-service (claim `perms`:
+  `file.asset.view`, `file.history.view`, `file.config.view`, `file.config.manage`) qua chain
+  riêng trong `shared/security/SecurityConfig`; mọi path khác vẫn dùng header `X-User-Id`/`X-User-Roles`
+  + `@RequiresAccess` như cũ. Actor của thao tác admin lấy từ `AdminActor` (JWT `sub`), không từ
+  `UserContext`. Thiết kế: `docs/superpowers/specs/2026-11-24-file-admin-api-design.md`.
+- Cột thời gian là `TIMESTAMP` và Hibernate ghi theo **UTC** (`hibernate.jdbc.time_zone: UTC`); query
+  JDBC thuần phải bind/đọc qua `UtcTimes`, KHÔNG dùng `java.sql.Timestamp`.
+- Cờ virus scan (công tắc tổng `file_platform_settings` + `file_categories.require_virus_scan`) hiện
+  chỉ là cấu hình — luồng upload chưa đọc cờ này cho tới khi tích hợp engine scan.
+
 ## Cấu trúc thư mục
 
 ```
 src/main/java/com/company/platform/
 ├── file/
 │   ├── api/                # Controller, Request/Response DTO
+│   │   └── admin/          # /api/admin/** (JWT + quyền file.*): file, thống kê, virus scan, category
 │   ├── domain/              # FileAsset, FileCategory (entity + repository interface)
 │   ├── storage/              # MinioStorageService, PresignedUrlService
 │   │   └── multipart/         # AWS SDK v2 S3 client + MultipartStorageService (luồng multipart)
 │   ├── application/           # FileUploadService, FileDownloadService (use case)
+│   │   └── admin/              # Admin console: VirusScanSettingsService, FileCategoryAdminService,
+│   │                           # FileAdminQueryService, FileStatsService
 │   └── internal/               # impl chi tiết, package-private, không expose
 │
 ├── job/
@@ -71,7 +84,9 @@ src/main/java/com/company/platform/
 │
 └── shared/
     ├── auth/                  # ResourceAuthorizationService, UserContext
-    ├── audit/                  # AuditLogService (append-only)
+    ├── audit/                  # AuditLogService (append-only); api/ = lịch sử download/file/cấu hình cho admin
+    ├── security/               # SecurityConfig: JWT chain chỉ cho /api/admin/**, FilePermissions, AdminActor
+    ├── pagination/             # KeysetCursor, PageSlice, TimeRange, UtcTimes (admin query)
     ├── ratelimit/               # RateLimiterService (Redis token bucket)
     └── config/                  # Common config, properties classes
 

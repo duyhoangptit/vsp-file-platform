@@ -1,6 +1,6 @@
 # Design Doc: File Admin API (console quản trị file)
 
-Status: Draft — chờ duyệt (đã qua builder check)
+Status: Approved for implementation (2026-11-24)
 Date: 2026-11-24
 
 ## 1. Mục tiêu & lý do
