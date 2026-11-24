@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Cùng khuôn với vsp-catalog-service / vsp-notification-platform: chọn format theo profile.
+  - profile local, dev (chạy từ IDE): text dễ đọc.
+  - còn lại (container, server): JSON format logstash ra stdout, có field "level", "logger_name",
+    "message", "@timestamp", MDC (traceId/spanId...) để Grafana Alloy gắn label level khi đẩy lên Loki.
+  JSON dùng StructuredLogEncoder có sẵn của Spring Boot, KHÔNG cần logstash-logback-encoder.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProfile name="local | dev">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} [trace=%X{traceId:-}] - %msg%n%ex</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <springProfile name="!local &amp; !dev">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+                <format>logstash</format>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="software.amazon.awssdk" level="WARN"/>
+</configuration>

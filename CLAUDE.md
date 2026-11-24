@@ -46,6 +46,9 @@ Modular monolith (Spring Boot) quản lý upload/download file và xử lý job 
   riêng trong `shared/security/SecurityConfig`; mọi path khác vẫn dùng header `X-User-Id`/`X-User-Roles`
   + `@RequiresAccess` như cũ. Actor của thao tác admin lấy từ `AdminActor` (JWT `sub`), không từ
   `UserContext`. Thiết kế: `docs/superpowers/specs/2026-11-24-file-admin-api-design.md`.
+- Log: `src/main/resources/logback-spring.xml` (cùng khuôn catalog/notification) — profile `local`/`dev`
+  = text, còn lại = JSON logstash qua `StructuredLogEncoder` của Spring Boot (không dùng
+  logstash-logback-encoder); `org.apache.kafka`, `software.amazon.awssdk` ở mức WARN.
 - Cột thời gian là `TIMESTAMP` và Hibernate ghi theo **UTC** (`hibernate.jdbc.time_zone: UTC`); query
   JDBC thuần phải bind/đọc qua `UtcTimes`, KHÔNG dùng `java.sql.Timestamp`.
 - Cờ virus scan (công tắc tổng `file_platform_settings` + `file_categories.require_virus_scan`) hiện

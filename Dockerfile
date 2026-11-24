@@ -27,9 +27,8 @@ USER appuser
 
 EXPOSE 8081
 
-# Container = JSON log ra stdout (logstash format, trường level) để Alloy -> Loki gắn label level;
-# chạy từ IDE không có biến này nên vẫn log text.
-ENV LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash
+# Format log do src/main/resources/logback-spring.xml quyết định theo profile: không có profile
+# local/dev (như trong container) = JSON logstash ra stdout (field level) cho Alloy -> Loki.
 
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
