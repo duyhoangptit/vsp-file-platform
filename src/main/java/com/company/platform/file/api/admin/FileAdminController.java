@@ -5,6 +5,7 @@ import com.company.platform.file.application.admin.FileAdminView;
 import com.company.platform.file.application.admin.FileCategoryAdminService;
 import com.company.platform.file.application.admin.FileSearchCriteria;
 import com.company.platform.file.application.admin.FileSource;
+import com.company.platform.file.application.admin.FileStatsService;
 import com.company.platform.file.domain.ScanStatus;
 import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.shared.pagination.KeysetCursor;
@@ -35,12 +36,37 @@ public class FileAdminController {
 
   private final FileAdminQueryService queryService;
   private final FileCategoryAdminService categoryAdminService;
+  private final FileStatsService statsService;
   private final Clock clock = Clock.systemUTC();
 
   public FileAdminController(
-      FileAdminQueryService queryService, FileCategoryAdminService categoryAdminService) {
+      FileAdminQueryService queryService,
+      FileCategoryAdminService categoryAdminService,
+      FileStatsService statsService) {
     this.queryService = queryService;
     this.categoryAdminService = categoryAdminService;
+    this.statsService = statsService;
+  }
+
+  @Operation(
+      summary = "Thống kê file",
+      description =
+          "Quyền file.asset.view. Chỉ tính file chưa soft-delete. from/to mặc định 30 ngày, tối"
+              + " đa 92 ngày.")
+  @ApiResponse(responseCode = "400", description = "Khoảng thời gian không hợp lệ")
+  @GetMapping("/stats")
+  public FileStatsResponse stats(
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant to,
+      @RequestParam(required = false) String categoryCode) {
+    return FileStatsResponse.from(
+        statsService.stats(TimeRange.resolve(from, to, clock), blankToNull(categoryCode)));
+  }
+
+  private static String blankToNull(String v) {
+    return v == null || v.isBlank() ? null : v.trim();
   }
 
   @Operation(

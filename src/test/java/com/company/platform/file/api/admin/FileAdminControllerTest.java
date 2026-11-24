@@ -17,16 +17,20 @@ import com.company.platform.file.application.admin.FileAdminView;
 import com.company.platform.file.application.admin.FileCategoryAdminService;
 import com.company.platform.file.application.admin.FileSearchCriteria;
 import com.company.platform.file.application.admin.FileSource;
+import com.company.platform.file.application.admin.FileStats;
+import com.company.platform.file.application.admin.FileStatsService;
 import com.company.platform.file.domain.FileAssetNotFoundException;
 import com.company.platform.file.domain.FileCategory;
 import com.company.platform.file.domain.ScanStatus;
 import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.shared.pagination.KeysetCursor;
 import com.company.platform.shared.pagination.PageSlice;
+import com.company.platform.shared.pagination.TimeRange;
 import com.company.platform.shared.security.AdminActor;
 import com.company.platform.shared.security.FilePermissions;
 import com.company.platform.shared.security.SecurityConfig;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,6 +50,7 @@ class FileAdminControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private FileAdminQueryService queryService;
   @MockitoBean private FileCategoryAdminService categoryAdminService;
+  @MockitoBean private FileStatsService statsService;
 
   private static RequestPostProcessor viewer() {
     return jwt()
@@ -138,6 +143,48 @@ class FileAdminControllerTest {
     assertThat(c.filename()).isEqualTo("bao cao");
     assertThat(c.includeDeleted()).isFalse();
     assertThat(c.range().to()).isAfter(c.range().from());
+  }
+
+  @Test
+  void should_returnStats_when_gettingStatsPath() throws Exception {
+    when(statsService.stats(any(), eq("CAT")))
+        .thenReturn(
+            new FileStats(
+                3,
+                157,
+                List.of(new FileStats.Bucket("CLEAN", 3, 157)),
+                List.of(new FileStats.Bucket("CAT", 3, 157)),
+                List.of(new FileStats.Bucket("text/csv", 3, 157)),
+                List.of(new FileStats.DailyBucket(LocalDate.parse("2026-11-24"), 3, 157))));
+
+    mockMvc
+        .perform(
+            get("/api/admin/files/stats")
+                .param("categoryCode", "CAT")
+                .param("from", "2026-11-01T00:00:00Z")
+                .param("to", "2026-11-25T00:00:00Z")
+                .with(viewer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalFiles").value(3))
+        .andExpect(jsonPath("$.totalBytes").value(157))
+        .andExpect(jsonPath("$.byMimeType[0].key").value("text/csv"))
+        .andExpect(jsonPath("$.daily[0].date").value("2026-11-24"));
+
+    ArgumentCaptor<TimeRange> range = ArgumentCaptor.forClass(TimeRange.class);
+    verify(statsService).stats(range.capture(), eq("CAT"));
+    assertThat(range.getValue().from()).isEqualTo(Instant.parse("2026-11-01T00:00:00Z"));
+    verify(queryService, never()).get(any());
+  }
+
+  @Test
+  void should_return400_when_statsRangeTooLong() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/admin/files/stats")
+                .param("from", "2026-01-01T00:00:00Z")
+                .param("to", "2026-11-01T00:00:00Z")
+                .with(viewer()))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

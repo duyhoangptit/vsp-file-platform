@@ -3,11 +3,14 @@ package com.company.platform.file.domain;
 import com.company.platform.file.application.admin.FileAdminView;
 import com.company.platform.file.application.admin.FileSearchCriteria;
 import com.company.platform.file.application.admin.FileSource;
+import com.company.platform.file.application.admin.FileStats;
 import com.company.platform.shared.pagination.KeysetCursor;
 import com.company.platform.shared.pagination.UtcTimes;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,6 +65,54 @@ public class FileAssetAdminQueryRepository {
             ROW_MAPPER)
         .stream()
         .findFirst();
+  }
+
+  /** {@code GROUP BY <column>} trong phạm vi bộ lọc, sắp theo số file giảm dần rồi theo key. */
+  public List<FileStats.Bucket> groupBy(FileSearchCriteria c, String column) {
+    if (!List.of("storage_status", "category_code", "mime_type").contains(column)) {
+      throw new IllegalArgumentException("Không hỗ trợ group by " + column);
+    }
+    StringBuilder sql =
+        new StringBuilder("SELECT ")
+            .append(column)
+            .append(" AS k, count(*) AS files, coalesce(sum(size_bytes), 0) AS bytes")
+            .append(" FROM file_assets WHERE created_at >= :from AND created_at < :to");
+    MapSqlParameterSource p = rangeParams(c);
+    appendFilters(sql, p, c);
+    sql.append(" GROUP BY ").append(column).append(" ORDER BY files DESC, k ASC");
+    return jdbc.query(
+        sql.toString(),
+        p,
+        (rs, i) ->
+            new FileStats.Bucket(rs.getString("k"), rs.getLong("files"), rs.getLong("bytes")));
+  }
+
+  /**
+   * Gom theo ngày ở {@code zone}: created_at là giờ UTC không kèm múi giờ ({@code
+   * hibernate.jdbc.time_zone: UTC}) nên phải gắn UTC trước rồi mới đổi sang {@code zone}.
+   */
+  public List<FileStats.DailyBucket> daily(FileSearchCriteria c, ZoneId zone) {
+    String day = "((created_at AT TIME ZONE 'UTC') AT TIME ZONE :zone)::date";
+    StringBuilder sql =
+        new StringBuilder("SELECT ")
+            .append(day)
+            .append(" AS d, count(*) AS files, coalesce(sum(size_bytes), 0) AS bytes")
+            .append(" FROM file_assets WHERE created_at >= :from AND created_at < :to");
+    MapSqlParameterSource p = rangeParams(c).addValue("zone", zone.getId());
+    appendFilters(sql, p, c);
+    sql.append(" GROUP BY d ORDER BY d ASC");
+    return jdbc.query(
+        sql.toString(),
+        p,
+        (rs, i) ->
+            new FileStats.DailyBucket(
+                rs.getObject("d", LocalDate.class), rs.getLong("files"), rs.getLong("bytes")));
+  }
+
+  private static MapSqlParameterSource rangeParams(FileSearchCriteria c) {
+    return new MapSqlParameterSource()
+        .addValue("from", UtcTimes.toDb(c.range().from()))
+        .addValue("to", UtcTimes.toDb(c.range().to()));
   }
 
   /** Bộ lọc dùng chung với thống kê (trừ cursor/ORDER BY). */
