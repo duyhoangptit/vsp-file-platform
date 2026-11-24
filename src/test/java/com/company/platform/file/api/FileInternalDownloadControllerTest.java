@@ -18,6 +18,7 @@ import com.company.platform.file.domain.FileNotAvailableForDownloadException;
 import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.shared.auth.InternalApiKeyInterceptor;
 import com.company.platform.shared.config.InternalApiWebConfig;
+import com.company.platform.shared.security.SecurityConfig;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -30,7 +31,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(FileInternalDownloadController.class)
-@Import({InternalApiKeyInterceptor.class, InternalApiWebConfig.class})
+@Import({InternalApiKeyInterceptor.class, InternalApiWebConfig.class, SecurityConfig.class})
 @TestPropertySource(properties = "app.internal-api.key=test-internal-api-key")
 class FileInternalDownloadControllerTest {
 

@@ -18,6 +18,7 @@ import com.company.platform.file.application.PartUrl;
 import com.company.platform.file.domain.FileAsset;
 import com.company.platform.file.storage.multipart.MultipartStorageService.UploadedPart;
 import com.company.platform.shared.auth.UserContext;
+import com.company.platform.shared.security.SecurityConfig;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -26,11 +27,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(FileMultipartUploadController.class)
+@Import(SecurityConfig.class)
 class FileMultipartUploadControllerTest {
 
   private static final UUID USER_ID = UUID.randomUUID();

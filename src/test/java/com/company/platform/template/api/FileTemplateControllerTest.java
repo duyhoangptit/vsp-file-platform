@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.company.platform.shared.auth.AccessDeniedException;
 import com.company.platform.shared.auth.ResourceType;
 import com.company.platform.shared.auth.UserContextConfig;
+import com.company.platform.shared.security.SecurityConfig;
 import com.company.platform.template.application.FileTemplateService;
 import com.company.platform.template.application.TemplateUploadInitiation;
 import com.company.platform.template.domain.FileTemplateNotFoundException;
@@ -23,7 +24,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(FileTemplateController.class)
-@Import(UserContextConfig.class)
+@Import({UserContextConfig.class, SecurityConfig.class})
 class FileTemplateControllerTest {
 
   @Autowired private MockMvc mockMvc;

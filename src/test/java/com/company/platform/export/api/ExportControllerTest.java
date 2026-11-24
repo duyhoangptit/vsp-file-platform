@@ -20,6 +20,7 @@ import com.company.platform.shared.auth.ResourceAuthorizationAspect;
 import com.company.platform.shared.auth.ResourceAuthorizationService;
 import com.company.platform.shared.auth.ResourceType;
 import com.company.platform.shared.auth.UserContextConfig;
+import com.company.platform.shared.security.SecurityConfig;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import({
   UserContextConfig.class,
   ResourceAuthorizationAspect.class,
-  org.springframework.boot.autoconfigure.aop.AopAutoConfiguration.class
+  org.springframework.boot.autoconfigure.aop.AopAutoConfiguration.class,
+  SecurityConfig.class
 })
 class ExportControllerTest {
 

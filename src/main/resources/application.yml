@@ -7,6 +7,16 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+    properties:
+      # Cột thời gian là TIMESTAMP (không lưu múi giờ): ghim UTC để giá trị ghi/đọc không phụ thuộc TZ
+      # của JVM, giống vsp-catalog-service / vsp-notification-platform.
+      hibernate.jdbc.time_zone: UTC
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # JWKS của vsp-identity-service — chỉ dùng cho /api/admin/** (shared/security/SecurityConfig).
+          jwk-set-uri: ${APP_ADMIN_JWKS_URI:http://localhost:8081/t/ticket-staff/.well-known/jwks.json}
   task:
     scheduling:
       pool:
@@ -57,6 +67,14 @@ management:
       enabled: false
 
 app:
+  # Admin API (/api/admin/**) xác thực bằng JWT identity + permission file.*. enabled=false chỉ
+  # dùng local (mọi caller có đủ quyền); profile prod sẽ fail lúc khởi động.
+  admin-security:
+    enabled: ${APP_ADMIN_SECURITY_ENABLED:true}
+    issuer: ${APP_ADMIN_JWT_ISSUER:}
+  admin:
+    # Múi giờ gom thống kê theo ngày (/api/admin/files/stats); dữ liệu vẫn lưu UTC.
+    stats-zone: ${APP_ADMIN_STATS_ZONE:Asia/Ho_Chi_Minh}
   # Shared secret cho các endpoint /api/internal/** (VD downloadFileBytes) — service-to-service,
   # không đại diện end-user nên không dùng UserContext/RequiresAccess (mục 3 design doc
   # 2026-08-08-internal-download-bytes-api-design.md). Cố tình KHÔNG đặt default thật ở đây,
