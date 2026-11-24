@@ -13,6 +13,9 @@ public record TimeRange(Instant from, Instant to) {
   public static TimeRange resolve(Instant from, Instant to, Clock clock) {
     Instant resolvedTo = to != null ? to : clock.instant();
     Instant resolvedFrom = from != null ? from : resolvedTo.minus(Duration.ofDays(DEFAULT_DAYS));
+    if (!StorableInstants.isStorable(resolvedFrom) || !StorableInstants.isStorable(resolvedTo)) {
+      throw new InvalidTimeRangeException("from/to phải nằm trong khoảng 1970-01-01 .. 9999-12-31");
+    }
     if (!resolvedFrom.isBefore(resolvedTo)) {
       throw new InvalidTimeRangeException("from phải nhỏ hơn to");
     }

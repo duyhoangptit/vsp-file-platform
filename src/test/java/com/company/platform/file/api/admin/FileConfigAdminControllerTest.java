@@ -136,30 +136,7 @@ class FileConfigAdminControllerTest {
   }
 
   @Test
-  void should_distinguishExplicitNullRetention_when_patching() throws Exception {
-    FileCategory category =
-        new FileCategory("A", "b", List.of("text/csv"), 10L, false, false, null, null);
-    when(fileCategoryAdminService.update(eq("A"), any(), eq(ACTOR))).thenReturn(category);
-
-    mockMvc
-        .perform(
-            patch("/api/admin/file-categories/A")
-                .with(admin())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"version\":0,\"retentionDays\":null}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.code").value("A"));
-
-    ArgumentCaptor<UpdateFileCategoryCommand> cmd =
-        ArgumentCaptor.forClass(UpdateFileCategoryCommand.class);
-    verify(fileCategoryAdminService).update(eq("A"), cmd.capture(), eq(ACTOR));
-    assertThat(cmd.getValue().retentionDaysPresent()).isTrue();
-    assertThat(cmd.getValue().retentionDays()).isNull();
-    assertThat(cmd.getValue().requireVirusScan()).isNull();
-  }
-
-  @Test
-  void should_treatMissingRetentionAsUnchanged_when_patching() throws Exception {
+  void should_passOnlyEditableFields_when_patching() throws Exception {
     FileCategory category =
         new FileCategory("A", "b", List.of("text/csv"), 10L, true, false, 5, null);
     when(fileCategoryAdminService.update(eq("A"), any(), eq(ACTOR))).thenReturn(category);
@@ -170,7 +147,8 @@ class FileConfigAdminControllerTest {
                 .with(admin())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":2,\"requireVirusScan\":true}"))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("A"));
 
     ArgumentCaptor<UpdateFileCategoryCommand> cmd =
         ArgumentCaptor.forClass(UpdateFileCategoryCommand.class);
@@ -178,6 +156,47 @@ class FileConfigAdminControllerTest {
     assertThat(cmd.getValue().version()).isEqualTo(2L);
     assertThat(cmd.getValue().retentionDaysPresent()).isFalse();
     assertThat(cmd.getValue().requireVirusScan()).isTrue();
+  }
+
+  @Test
+  void should_return400_when_patchTouchesRetentionDays() throws Exception {
+    for (String body :
+        List.of("{\"version\":0,\"retentionDays\":5}", "{\"version\":0,\"retentionDays\":null}")) {
+      mockMvc
+          .perform(
+              patch("/api/admin/file-categories/A")
+                  .with(admin())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    }
+    verify(fileCategoryAdminService, never()).update(any(), any(), any());
+  }
+
+  @Test
+  void should_return400_when_patchHasUnknownOrReadOnlyField() throws Exception {
+    for (String body :
+        List.of("{\"version\":0,\"bucketName\":\"x\"}", "{\"version\":0,\"foo\":1}")) {
+      mockMvc
+          .perform(
+              patch("/api/admin/file-categories/A")
+                  .with(admin())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    }
+    verify(fileCategoryAdminService, never()).update(any(), any(), any());
+  }
+
+  @Test
+  void should_return400_when_versionNotInteger() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/admin/file-categories/A")
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":1.9,\"requireVirusScan\":true}"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

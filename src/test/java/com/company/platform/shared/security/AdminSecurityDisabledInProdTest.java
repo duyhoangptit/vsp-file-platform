@@ -12,23 +12,42 @@ class AdminSecurityDisabledInProdTest {
   private final WebApplicationContextRunner runner =
       new WebApplicationContextRunner()
           .withConfiguration(AutoConfigurations.of(SecurityAutoConfiguration.class))
-          .withUserConfiguration(SecurityConfig.class);
+          .withUserConfiguration(SecurityConfig.class)
+          .withPropertyValues(
+              "app.admin-security.enabled=false",
+              "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost/jwks");
+
+  private static Throwable root(Throwable t) {
+    while (t.getCause() != null) {
+      t = t.getCause();
+    }
+    return t;
+  }
 
   @Test
   void should_failStartup_when_securityDisabledInProd() {
     runner
-        .withPropertyValues(
-            "spring.profiles.active=prod",
-            "app.admin-security.enabled=false",
-            "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost/jwks")
+        .withPropertyValues("spring.profiles.active=prod")
         .run(
             context -> {
               assertThat(context).hasFailed();
-              Throwable root = context.getStartupFailure();
-              while (root.getCause() != null) {
-                root = root.getCause();
-              }
-              assertThat(root).hasMessageContaining("not allowed with profile 'prod'");
+              assertThat(root(context.getStartupFailure()))
+                  .hasMessageContaining("only allowed with profile local or dev");
             });
+  }
+
+  @Test
+  void should_failStartup_when_securityDisabledWithoutLocalProfile() {
+    runner.run(context -> assertThat(context).hasFailed());
+    runner
+        .withPropertyValues("spring.profiles.active=staging")
+        .run(context -> assertThat(context).hasFailed());
+  }
+
+  @Test
+  void should_start_when_securityDisabledInDevProfile() {
+    runner
+        .withPropertyValues("spring.profiles.active=dev")
+        .run(context -> assertThat(context).hasNotFailed());
   }
 }

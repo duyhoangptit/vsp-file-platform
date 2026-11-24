@@ -56,6 +56,7 @@ public class SecurityConfig {
 
   static final String ADMIN_PATTERN = "/api/admin/**";
   static final String LOCAL_PRINCIPAL = "local-dev";
+  static final java.util.Set<String> LOCAL_PROFILES = java.util.Set.of("local", "dev");
 
   @Bean
   @Order(1)
@@ -75,9 +76,10 @@ public class SecurityConfig {
                         (req, res, ex) -> writeError(res, 403, "Không có quyền truy cập")));
 
     if (!props.enabled()) {
-      if (Arrays.asList(env.getActiveProfiles()).contains("prod")) {
+      // Allow-list (không phải deny "prod"): profile khác tên hoặc không có profile vẫn fail.
+      if (Arrays.stream(env.getActiveProfiles()).noneMatch(LOCAL_PROFILES::contains)) {
         throw new IllegalStateException(
-            "app.admin-security.enabled=false is not allowed with profile 'prod'");
+            "app.admin-security.enabled=false is only allowed with profile local or dev");
       }
       log.warn(
           "ADMIN SECURITY DISABLED (app.admin-security.enabled=false): every admin caller has"

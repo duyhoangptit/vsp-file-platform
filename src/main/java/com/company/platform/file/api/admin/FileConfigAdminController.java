@@ -77,10 +77,10 @@ public class FileConfigAdminController {
   @Operation(
       summary = "Sửa file category",
       description =
-          "Quyền file.config.manage. version bắt buộc; field vắng mặt = không đổi;"
-              + " \"retentionDays\": null = xoá retention. Không sửa được code, bucketName,"
-              + " publicAccess, multipartPartSizeBytes. Mime type dạng type/subtype, không wildcard."
-              + " Chỉ áp cho upload mới.")
+          "Quyền file.config.manage. version bắt buộc; chỉ sửa được requireVirusScan,"
+              + " allowedMimeTypes, maxSizeBytes (field vắng mặt = không đổi, field khác → 400)."
+              + " retentionDays tạm chưa cho sửa (lifecycle MinIO chưa đồng bộ). Mime type dạng"
+              + " type/subtype, không wildcard. Chỉ áp cho upload mới.")
   @RequestBody(
       content =
           @Content(
@@ -89,7 +89,7 @@ public class FileConfigAdminController {
                       value =
                           "{\"version\":0,\"requireVirusScan\":true,"
                               + "\"allowedMimeTypes\":[\"image/png\",\"image/jpeg\"],"
-                              + "\"maxSizeBytes\":5242880,\"retentionDays\":null}")))
+                              + "\"maxSizeBytes\":5242880}")))
   @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
   @ApiResponse(responseCode = "404", description = "Không có category")
   @ApiResponse(responseCode = "409", description = "version đã cũ")

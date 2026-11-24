@@ -76,9 +76,13 @@ public class AuditAdminQueryRepository {
       TimeRange range, UUID actorId, String resourceKey, KeysetCursor cursor, int fetch) {
     StringBuilder sql =
         new StringBuilder(
-            "SELECT * FROM audit_logs WHERE action IN (:globalUpdated, :categoryUpdated)"
+            "SELECT * FROM audit_logs WHERE resource_type IN (:settingType, :categoryType)"
+                + " AND action IN (:globalUpdated, :categoryUpdated)"
                 + " AND created_at >= :from AND created_at < :to");
     Map<String, Object> p = new LinkedHashMap<>();
+    // resource_type dẫn đầu để dùng được idx_audit_logs_type_action_created (changeset 014)
+    p.put("settingType", FileAuditActions.RESOURCE_FILE_PLATFORM_SETTING);
+    p.put("categoryType", FileAuditActions.RESOURCE_FILE_CATEGORY);
     p.put("globalUpdated", FileAuditActions.VIRUS_SCAN_GLOBAL_UPDATED);
     p.put("categoryUpdated", FileAuditActions.FILE_CATEGORY_UPDATED);
     range(p, range);

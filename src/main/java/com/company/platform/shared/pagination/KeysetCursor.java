@@ -26,8 +26,11 @@ public record KeysetCursor(Instant createdAt, UUID id) {
       if (sep < 0) {
         throw new InvalidCursorException();
       }
-      return new KeysetCursor(
-          Instant.parse(raw.substring(0, sep)), UUID.fromString(raw.substring(sep + 1)));
+      Instant createdAt = Instant.parse(raw.substring(0, sep));
+      if (!StorableInstants.isStorable(createdAt)) {
+        throw new InvalidCursorException();
+      }
+      return new KeysetCursor(createdAt, UUID.fromString(raw.substring(sep + 1)));
     } catch (IllegalArgumentException | DateTimeParseException e) {
       throw new InvalidCursorException();
     }

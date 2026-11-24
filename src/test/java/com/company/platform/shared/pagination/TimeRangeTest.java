@@ -41,6 +41,24 @@ class TimeRangeTest {
   }
 
   @Test
+  void should_reject_when_instantOutsideStorableRange() {
+    assertThatThrownBy(
+            () ->
+                TimeRange.resolve(
+                    Instant.parse("+300000-01-01T00:00:00Z"),
+                    Instant.parse("+300000-01-02T00:00:00Z"),
+                    clock))
+        .isInstanceOf(InvalidTimeRangeException.class);
+    assertThatThrownBy(
+            () ->
+                TimeRange.resolve(
+                    Instant.parse("1969-12-31T00:00:00Z"),
+                    Instant.parse("1970-01-02T00:00:00Z"),
+                    clock))
+        .isInstanceOf(InvalidTimeRangeException.class);
+  }
+
+  @Test
   void should_clampLimit_when_outOfBounds() {
     assertThat(PageSlice.clampLimit(null)).isEqualTo(50);
     assertThat(PageSlice.clampLimit(0)).isEqualTo(1);

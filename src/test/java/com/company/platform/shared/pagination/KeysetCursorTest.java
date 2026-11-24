@@ -36,6 +36,15 @@ class KeysetCursorTest {
   }
 
   @Test
+  void should_throwInvalidCursor_when_instantOutsideStorableRange() {
+    assertThatThrownBy(
+            () -> KeysetCursor.decode(b64("+300000-01-01T00:00:00Z|" + UUID.randomUUID())))
+        .isInstanceOf(InvalidCursorException.class);
+    assertThatThrownBy(() -> KeysetCursor.decode(b64("1969-12-31T23:59:59Z|" + UUID.randomUUID())))
+        .isInstanceOf(InvalidCursorException.class);
+  }
+
+  @Test
   void should_returnNull_when_cursorBlank() {
     assertThat(KeysetCursor.decodeOrNull(null)).isNull();
     assertThat(KeysetCursor.decodeOrNull("  ")).isNull();

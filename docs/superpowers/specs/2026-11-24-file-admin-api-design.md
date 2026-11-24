@@ -254,6 +254,12 @@ Validate: `allowedMimeTypes` không rỗng, mỗi phần tử dạng `type/subty
 > 0; `retentionDays` null hoặc > 0. Sai `version` → 409, không tồn tại → 404.
 Thay đổi chỉ áp cho upload **mới**, file đã upload giữ nguyên.
 
+> **Cập nhật sau review (2026-11-24):** `retentionDays` **tạm chưa cho sửa** qua PATCH (gửi lên → 400),
+> cùng mọi field ngoài `version`/`requireVirusScan`/`allowedMimeTypes`/`maxSizeBytes`. Lý do: lifecycle
+> rule MinIO chỉ set lúc tạo bucket và áp cho cả bucket, `expires_at` của file cũ không được tính lại,
+> `CleanupService` bỏ qua category có retention null — sửa qua API sẽ làm DB và storage lệch. Cần một
+> thiết kế riêng (cập nhật lifecycle bucket + backfill `expires_at`).
+
 Lỗi trả `ApiError` hiện có. `file.api.admin` đã nằm trong phạm vi của `FileApiExceptionHandler`
 (`basePackages = file.api`), nên **thêm handler vào đó**: optimistic-lock → 409, validate
 → 400, range quá 92 ngày → 400. Không tạo advice mới cho `file`. `shared.audit.api` chỉ cần

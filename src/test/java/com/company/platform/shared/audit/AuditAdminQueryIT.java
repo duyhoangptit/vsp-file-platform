@@ -216,6 +216,23 @@ class AuditAdminQueryIT {
   }
 
   @Test
+  void should_ignoreConfigActionNames_when_resourceTypeIsNotConfig() {
+    UUID real =
+        audit(
+            "FILE_CATEGORY_UPDATED",
+            "FILE_CATEGORY",
+            AuditResourceIds.forCategory("A"),
+            "SUCCESS",
+            BASE,
+            "{\"resourceKey\":\"A\"}");
+    audit("FILE_CATEGORY_UPDATED", "FILE_ASSET", UUID.randomUUID(), "SUCCESS", BASE, null);
+
+    assertThat(queryService.configChanges(RANGE, null, null, null, 50).items())
+        .extracting(ConfigChangeItem::id)
+        .containsExactly(real);
+  }
+
+  @Test
   void should_returnAllActionsForFile_when_readingFileHistory() {
     UUID f = UUID.randomUUID();
     UUID a = fileAudit("FILE_UPLOAD_COMPLETED", f, "SUCCESS", BASE.minus(200, ChronoUnit.DAYS));
