@@ -90,7 +90,8 @@ class FileDownloadServiceTest {
     UUID fileAssetId = UUID.randomUUID();
     when(fileAssetRepository.findById(fileAssetId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.generateDownloadUrl(fileAssetId))
+    assertThatThrownBy(
+            () -> service.generateDownloadUrl(fileAssetId, UUID.randomUUID(), "FILE_API"))
         .isInstanceOf(FileAssetNotFoundException.class);
   }
 
@@ -105,7 +106,8 @@ class FileDownloadServiceTest {
     when(minioStorageService.generatePresignedGetUrl(eq("bucket"), eq("object-key"), any()))
         .thenReturn("https://minio/presigned");
 
-    FileDownloadResult result = service.generateDownloadUrl(fileAssetId);
+    FileDownloadResult result =
+        service.generateDownloadUrl(fileAssetId, UUID.randomUUID(), "FILE_API");
 
     assertThat(result.downloadUrl()).isEqualTo("https://minio/presigned");
   }

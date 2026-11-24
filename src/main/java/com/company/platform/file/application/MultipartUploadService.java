@@ -186,7 +186,9 @@ public class MultipartUploadService {
             .toList());
 
     fileAssetRepository.updateSizeBytes(asset.getId(), totalSize, Instant.now());
-    FileAsset clean = fileAssetStatusFinalizer.finalizeToClean(asset.getId(), cmd.checksumSha256());
+    FileAsset clean =
+        fileAssetStatusFinalizer.finalizeToClean(
+            asset.getId(), cmd.checksumSha256(), cmd.actorId());
     fileAssetRepository.clearMultipartUploadId(asset.getId(), Instant.now());
     return clean;
   }

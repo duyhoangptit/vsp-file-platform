@@ -86,8 +86,8 @@ public class FileUploadService {
    * tránh tải server) — HEAD chỉ xác thực object tồn tại và khớp size đã khai báo.
    */
   @Transactional
-  public FileAsset confirmUpload(UUID fileAssetId, String checksumSha256) {
-    return fileAssetStatusFinalizer.finalizeToClean(fileAssetId, checksumSha256);
+  public FileAsset confirmUpload(UUID fileAssetId, String checksumSha256, UUID actorId) {
+    return fileAssetStatusFinalizer.finalizeToClean(fileAssetId, checksumSha256, actorId);
   }
 
   /**
@@ -149,9 +149,13 @@ public class FileUploadService {
       throw new InvalidFileAssetStateException(fileAssetId, StorageStatus.UPLOADED_DMZ);
     }
 
-    return fileAssetRepository
-        .findById(fileAssetId)
-        .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    FileAsset clean =
+        fileAssetRepository
+            .findById(fileAssetId)
+            .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    // Do job sinh, không gắn với actor của 1 request cụ thể.
+    fileAssetStatusFinalizer.recordUploadCompleted(clean, null, "JOB_GENERATED");
+    return clean;
   }
 
   // retentionDays null = giữ file vĩnh viễn, không set expiresAt (mục 10 design doc) — cùng

@@ -1,5 +1,6 @@
 package com.company.platform.shared.audit;
 
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -16,7 +17,19 @@ public class AuditLogService {
 
   public void record(
       UUID actorId, String action, String resourceType, UUID resourceId, AuditResult result) {
-    auditLogRepository.save(new AuditLog(actorId, action, resourceType, resourceId, null, result));
+    record(actorId, action, resourceType, resourceId, null, result);
+  }
+
+  /** Như {@link #record}, kèm {@code metadata} (JSONB) — chạy trong transaction của caller. */
+  public void record(
+      UUID actorId,
+      String action,
+      String resourceType,
+      UUID resourceId,
+      Map<String, Object> metadata,
+      AuditResult result) {
+    auditLogRepository.save(
+        new AuditLog(actorId, action, resourceType, resourceId, metadata, result));
   }
 
   /**

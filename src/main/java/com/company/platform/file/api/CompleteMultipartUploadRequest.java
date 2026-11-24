@@ -28,12 +28,13 @@ public record CompleteMultipartUploadRequest(
           @NotBlank
           String etag) {}
 
-  public CompleteMultipartUploadCommand toCommand(UUID fileAssetId) {
+  public CompleteMultipartUploadCommand toCommand(UUID fileAssetId, UUID actorId) {
     return new CompleteMultipartUploadCommand(
         fileAssetId,
         parts.stream()
             .map(p -> new CompleteMultipartUploadCommand.PartRef(p.partNumber(), p.etag()))
             .toList(),
-        checksumSha256);
+        checksumSha256,
+        actorId);
   }
 }

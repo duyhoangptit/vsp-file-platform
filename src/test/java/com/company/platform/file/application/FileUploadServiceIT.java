@@ -95,12 +95,13 @@ class FileUploadServiceIT {
 
     putToPresignedUrl(initiation.uploadUrl(), bytes);
 
-    FileAsset confirmed = fileUploadService.confirmUpload(initiation.fileAssetId(), "fake-sha256");
+    FileAsset confirmed =
+        fileUploadService.confirmUpload(initiation.fileAssetId(), "fake-sha256", UUID.randomUUID());
     assertThat(confirmed.getStorageStatus()).isEqualTo(StorageStatus.CLEAN);
     assertThat(confirmed.getChecksumSha256()).isEqualTo("fake-sha256");
 
     FileAsset confirmedAgain =
-        fileUploadService.confirmUpload(initiation.fileAssetId(), "fake-sha256");
+        fileUploadService.confirmUpload(initiation.fileAssetId(), "fake-sha256", UUID.randomUUID());
     assertThat(confirmedAgain.getStorageStatus()).isEqualTo(StorageStatus.CLEAN);
   }
 
@@ -121,7 +122,9 @@ class FileUploadServiceIT {
     putToPresignedUrl(
         initiation.uploadUrl(), "wrong size content".getBytes(StandardCharsets.UTF_8));
 
-    assertThatThrownBy(() -> fileUploadService.confirmUpload(initiation.fileAssetId(), "sha"))
+    assertThatThrownBy(
+            () ->
+                fileUploadService.confirmUpload(initiation.fileAssetId(), "sha", UUID.randomUUID()))
         .isInstanceOf(FileVerificationFailedException.class);
   }
 

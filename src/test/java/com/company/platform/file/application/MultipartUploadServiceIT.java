@@ -163,7 +163,8 @@ class MultipartUploadServiceIT {
                 List.of(
                     new CompleteMultipartUploadCommand.PartRef(1, e1),
                     new CompleteMultipartUploadCommand.PartRef(2, e2)),
-                "cafe"));
+                "cafe",
+                UUID.randomUUID()));
 
     assertThat(done.getStorageStatus()).isEqualTo(StorageStatus.CLEAN);
     assertThat(done.getSizeBytes()).isEqualTo((long) p1.length + p2.length);
@@ -234,7 +235,8 @@ class MultipartUploadServiceIT {
                     new CompleteMultipartUploadCommand(
                         init.fileAssetId(),
                         List.of(new CompleteMultipartUploadCommand.PartRef(1, e1)),
-                        "cafe")))
+                        "cafe",
+                        UUID.randomUUID())))
         .isInstanceOf(FileVerificationFailedException.class);
 
     // not CLEAN, and row NOT soft-deleted (dangling uploadId is intentional — Task 9 sweep is the

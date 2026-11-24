@@ -197,7 +197,9 @@ public class FileMultipartUploadController {
   @RequiresAccess(type = ResourceType.FILE_ASSET, action = Action.WRITE)
   public FileAssetResponse complete(
       @PathVariable UUID fileAssetId, @Valid @RequestBody CompleteMultipartUploadRequest request) {
-    FileAsset fileAsset = multipartUploadService.completeMultipart(request.toCommand(fileAssetId));
+    FileAsset fileAsset =
+        multipartUploadService.completeMultipart(
+            request.toCommand(fileAssetId, userContext.userId()));
     return FileAssetResponse.from(fileAsset);
   }
 

@@ -97,7 +97,8 @@ public class FileTemplateService {
     requireAdmin(user, ACTION_UPLOAD_CONFIRM, command.category(), command.templateCode());
 
     FileAsset fileAsset =
-        fileUploadService.confirmUpload(command.fileAssetId(), command.checksumSha256());
+        fileUploadService.confirmUpload(
+            command.fileAssetId(), command.checksumSha256(), user.userId());
     UUID templateId = fileAsset.getOwnerId();
 
     acquireVersionLock(command.category(), command.templateCode());
@@ -130,7 +131,9 @@ public class FileTemplateService {
                 .orElseThrow(
                     () -> new FileTemplateNotFoundException(category, templateCode, version));
 
-    FileDownloadResult result = fileDownloadService.generateDownloadUrl(fileTemplate.getFileId());
+    FileDownloadResult result =
+        fileDownloadService.generateDownloadUrl(
+            fileTemplate.getFileId(), user.userId(), "TEMPLATE_API");
     auditLogService.record(
         user.userId(),
         ACTION_DOWNLOAD,

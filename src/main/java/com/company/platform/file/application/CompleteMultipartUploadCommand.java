@@ -8,7 +8,7 @@ import java.util.UUID;
  * trả về lúc PUT part) và checksum SHA-256 client tự tính.
  */
 public record CompleteMultipartUploadCommand(
-    UUID fileAssetId, List<PartRef> parts, String checksumSha256) {
+    UUID fileAssetId, List<PartRef> parts, String checksumSha256, UUID actorId) {
 
   public record PartRef(int partNumber, String etag) {}
 }

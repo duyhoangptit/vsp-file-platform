@@ -7,8 +7,12 @@ import com.company.platform.file.domain.FileVerificationFailedException;
 import com.company.platform.file.domain.InvalidFileAssetStateException;
 import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.file.storage.MinioStorageService;
+import com.company.platform.shared.audit.AuditLogService;
+import com.company.platform.shared.audit.AuditResult;
+import com.company.platform.shared.audit.FileAuditActions;
 import io.minio.StatObjectResponse;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +27,35 @@ public class FileAssetStatusFinalizer {
 
   private final FileAssetRepository fileAssetRepository;
   private final MinioStorageService minioStorageService;
+  private final AuditLogService auditLogService;
 
   public FileAssetStatusFinalizer(
-      FileAssetRepository fileAssetRepository, MinioStorageService minioStorageService) {
+      FileAssetRepository fileAssetRepository,
+      MinioStorageService minioStorageService,
+      AuditLogService auditLogService) {
     this.fileAssetRepository = fileAssetRepository;
     this.minioStorageService = minioStorageService;
+    this.auditLogService = auditLogService;
+  }
+
+  /**
+   * Ghi {@code FILE_UPLOAD_COMPLETED} — chỉ gọi ngay sau khi CAS {@code UPLOADED_DMZ -> CLEAN}
+   * thành công (không ghi ở nhánh idempotent đã CLEAN), cùng transaction với CAS.
+   *
+   * @param source {@code USER_UPLOAD} hoặc {@code JOB_GENERATED}
+   */
+  public void recordUploadCompleted(FileAsset fileAsset, UUID actorId, String source) {
+    auditLogService.record(
+        actorId,
+        FileAuditActions.UPLOAD_COMPLETED,
+        FileAuditActions.RESOURCE_FILE_ASSET,
+        fileAsset.getId(),
+        Map.of(
+            "sizeBytes", fileAsset.getSizeBytes(),
+            "mimeType", fileAsset.getMimeType(),
+            "categoryCode", fileAsset.getCategoryCode(),
+            "source", source),
+        AuditResult.SUCCESS);
   }
 
   /**
@@ -37,7 +65,7 @@ public class FileAssetStatusFinalizer {
    * tránh tải server) — HEAD chỉ xác thực object tồn tại và khớp size đã khai báo.
    */
   @Transactional
-  public FileAsset finalizeToClean(UUID fileAssetId, String checksumSha256) {
+  public FileAsset finalizeToClean(UUID fileAssetId, String checksumSha256, UUID actorId) {
     FileAsset fileAsset =
         fileAssetRepository
             .findById(fileAssetId)
@@ -73,9 +101,12 @@ public class FileAssetStatusFinalizer {
       throw new InvalidFileAssetStateException(fileAssetId, fileAsset.getStorageStatus());
     }
 
-    return fileAssetRepository
-        .findById(fileAssetId)
-        .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    FileAsset clean =
+        fileAssetRepository
+            .findById(fileAssetId)
+            .orElseThrow(() -> new FileAssetNotFoundException(fileAssetId));
+    recordUploadCompleted(clean, actorId, "USER_UPLOAD");
+    return clean;
   }
 
   private void verifyUploadedObject(FileAsset fileAsset) {

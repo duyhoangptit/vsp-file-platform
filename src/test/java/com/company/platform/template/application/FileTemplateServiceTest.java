@@ -108,7 +108,7 @@ class FileTemplateServiceTest {
             .findFirstByCategoryAndTemplateCodeAndDeletedAtIsNullOrderByVersionDesc(
                 "MEMBER", "MEMBER_IMPORT"))
         .thenReturn(Optional.of(latest));
-    when(fileDownloadService.generateDownloadUrl(latest.getFileId()))
+    when(fileDownloadService.generateDownloadUrl(eq(latest.getFileId()), any(), any()))
         .thenReturn(new FileDownloadResult("https://minio/latest", Instant.now()));
 
     FileDownloadResult result =
@@ -134,7 +134,7 @@ class FileTemplateServiceTest {
     when(fileTemplateRepository.findFirstByCategoryAndTemplateCodeAndVersionAndDeletedAtIsNull(
             "MEMBER", "MEMBER_IMPORT", 1))
         .thenReturn(Optional.of(v1));
-    when(fileDownloadService.generateDownloadUrl(v1.getFileId()))
+    when(fileDownloadService.generateDownloadUrl(eq(v1.getFileId()), any(), any()))
         .thenReturn(new FileDownloadResult("https://minio/v1", Instant.now()));
 
     FileDownloadResult result =

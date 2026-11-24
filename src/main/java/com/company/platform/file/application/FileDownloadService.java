@@ -8,9 +8,11 @@ import com.company.platform.file.domain.StorageStatus;
 import com.company.platform.file.storage.MinioStorageService;
 import com.company.platform.shared.audit.AuditLogService;
 import com.company.platform.shared.audit.AuditResult;
+import com.company.platform.shared.audit.FileAuditActions;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -34,16 +36,31 @@ public class FileDownloadService {
     this.auditLogService = auditLogService;
   }
 
-  /** Chỉ sinh presigned GET khi storage_status = CLEAN, đúng bất biến ở mục 5. */
-  public FileDownloadResult generateDownloadUrl(UUID fileAssetId) {
+  /**
+   * Chỉ sinh presigned GET khi storage_status = CLEAN, đúng bất biến ở mục 5. Ghi {@code
+   * FILE_DOWNLOAD_URL_ISSUED} sau khi sinh URL thành công (lịch sử download của admin API).
+   *
+   * @param via {@code FILE_API} hoặc {@code TEMPLATE_API}
+   */
+  public FileDownloadResult generateDownloadUrl(UUID fileAssetId, UUID actorId, String via) {
     FileAsset fileAsset = requireCleanFileAsset(fileAssetId);
-    return buildResult(fileAsset);
+    FileDownloadResult result = buildResult(fileAsset);
+    auditLogService.record(
+        actorId,
+        FileAuditActions.DOWNLOAD_URL_ISSUED,
+        FILE_ASSET_RESOURCE_TYPE,
+        fileAssetId,
+        Map.of("expiresInSeconds", DOWNLOAD_URL_EXPIRY.toSeconds(), "via", via),
+        AuditResult.SUCCESS);
+    return result;
   }
 
   /**
    * Dùng cho các module sở hữu job (VD export) để nhúng thẳng download URL vào response trạng thái
    * job của họ, thay vì bắt client gọi thêm round-trip qua fileAssetId — fileAssetId vẫn ở lại bên
-   * trong file module, không lộ ra ngoài qua path này.
+   * trong file module, không lộ ra ngoài qua path này. Cố tình KHÔNG ghi audit download: URL được
+   * nhúng lại mỗi lần client poll trạng thái job (không phản ánh lượt tải thật), và export đã có
+   * audit trail riêng.
    */
   public Optional<FileDownloadResult> findDownloadUrlByJobId(UUID jobId) {
     return fileAssetRepository

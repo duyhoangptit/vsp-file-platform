@@ -132,7 +132,9 @@ public class FileUploadController {
   @RequiresAccess(type = ResourceType.FILE_ASSET, action = Action.WRITE)
   public FileAssetResponse confirmUpload(
       @PathVariable UUID fileAssetId, @Valid @RequestBody ConfirmFileUploadRequest request) {
-    FileAsset fileAsset = fileUploadService.confirmUpload(fileAssetId, request.checksumSha256());
+    FileAsset fileAsset =
+        fileUploadService.confirmUpload(
+            fileAssetId, request.checksumSha256(), userContext.userId());
     return FileAssetResponse.from(fileAsset);
   }
 }

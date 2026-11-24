@@ -5,6 +5,7 @@ import com.company.platform.shared.auth.Action;
 import com.company.platform.shared.auth.AuthExceptionHandler;
 import com.company.platform.shared.auth.RequiresAccess;
 import com.company.platform.shared.auth.ResourceType;
+import com.company.platform.shared.auth.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -21,9 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class FileDownloadController {
 
   private final FileDownloadService fileDownloadService;
+  private final UserContext userContext;
 
-  public FileDownloadController(FileDownloadService fileDownloadService) {
+  public FileDownloadController(FileDownloadService fileDownloadService, UserContext userContext) {
     this.fileDownloadService = fileDownloadService;
+    this.userContext = userContext;
   }
 
   @Operation(
@@ -61,6 +64,7 @@ public class FileDownloadController {
   @GetMapping("/{fileAssetId}/download-url")
   @RequiresAccess(type = ResourceType.FILE_ASSET, action = Action.READ)
   public FileDownloadResponse getDownloadUrl(@PathVariable UUID fileAssetId) {
-    return FileDownloadResponse.from(fileDownloadService.generateDownloadUrl(fileAssetId));
+    return FileDownloadResponse.from(
+        fileDownloadService.generateDownloadUrl(fileAssetId, userContext.userId(), "FILE_API"));
   }
 }

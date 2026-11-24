@@ -91,7 +91,7 @@ class FileUploadControllerTest {
     when(resourceAuthorizationService.canAccess(
             any(), eq(ResourceType.FILE_ASSET), any(), eq(Action.WRITE)))
         .thenReturn(true);
-    when(fileUploadService.confirmUpload(eq(fileAssetId), any()))
+    when(fileUploadService.confirmUpload(eq(fileAssetId), any(), any()))
         .thenReturn(
             new FileAsset(
                 fileAssetId,
@@ -131,7 +131,7 @@ class FileUploadControllerTest {
                 .content("{\"checksumSha256\": \"deadbeef\"}"))
         .andExpect(status().isForbidden());
 
-    verify(fileUploadService, org.mockito.Mockito.never()).confirmUpload(any(), any());
+    verify(fileUploadService, org.mockito.Mockito.never()).confirmUpload(any(), any(), any());
   }
 
   @Test
