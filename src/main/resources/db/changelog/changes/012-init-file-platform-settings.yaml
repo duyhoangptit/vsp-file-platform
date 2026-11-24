@@ -1,0 +1,43 @@
+databaseChangeLog:
+  # Cấu hình runtime toàn hệ thống do admin chỉnh qua /api/admin/** (không cần deploy lại) —
+  # hiện chỉ có công tắc tổng virus scan. Mặc định TẮT: luồng scan thật (ClamAV) chưa tích hợp.
+  - changeSet:
+      id: 012-1-create-file-platform-settings
+      author: platform
+      changes:
+        - createTable:
+            tableName: file_platform_settings
+            columns:
+              - column:
+                  name: setting_key
+                  type: VARCHAR(100)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: setting_value
+                  type: JSONB
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: UUID
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 012-2-seed-virus-scan-global-disabled
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO file_platform_settings (setting_key, setting_value, updated_by, updated_at, version)
+              VALUES ('virus_scan.enabled', 'false'::jsonb, NULL, now() AT TIME ZONE 'UTC', 0);

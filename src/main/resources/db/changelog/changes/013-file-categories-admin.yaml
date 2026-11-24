@@ -1,0 +1,20 @@
+databaseChangeLog:
+  # Optimistic lock + người sửa cuối cho PATCH /api/admin/file-categories/{code}.
+  # require_virus_scan đã mặc định false (002) và mọi category seed đều false — cố tình KHÔNG
+  # UPDATE reset, để không ghi đè category nào đã được bật tay.
+  - changeSet:
+      id: 013-1-add-admin-columns-to-file-categories
+      author: platform
+      changes:
+        - addColumn:
+            tableName: file_categories
+            columns:
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: UUID

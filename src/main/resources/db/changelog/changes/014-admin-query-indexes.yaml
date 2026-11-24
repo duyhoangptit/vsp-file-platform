@@ -1,0 +1,26 @@
+databaseChangeLog:
+  # Keyset pagination cho admin API: danh sách file (created_at DESC, id DESC) và lịch sử audit
+  # theo action (download / thay đổi cấu hình).
+  - changeSet:
+      id: 014-1-index-file-assets-created-id
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              CREATE INDEX idx_file_assets_created_id
+                ON file_assets (created_at DESC, id DESC)
+                WHERE deleted_at IS NULL;
+      rollback:
+        - sql:
+            sql: DROP INDEX idx_file_assets_created_id;
+  - changeSet:
+      id: 014-2-index-audit-logs-type-action-created
+      author: platform
+      changes:
+        - sql:
+            sql: |
+              CREATE INDEX idx_audit_logs_type_action_created
+                ON audit_logs (resource_type, action, created_at DESC, id DESC);
+      rollback:
+        - sql:
+            sql: DROP INDEX idx_audit_logs_type_action_created;

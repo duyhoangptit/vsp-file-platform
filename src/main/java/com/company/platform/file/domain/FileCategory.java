@@ -4,8 +4,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -45,6 +47,13 @@ public class FileCategory {
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
+  @Version
+  @Column(name = "version", nullable = false)
+  private long version;
+
+  @Column(name = "updated_by")
+  private UUID updatedBy;
+
   protected FileCategory() {}
 
   public FileCategory(
@@ -67,5 +76,34 @@ public class FileCategory {
     this.multipartPartSizeBytes = multipartPartSizeBytes;
     this.createdAt = now;
     this.updatedAt = now;
+  }
+
+  /**
+   * Sửa cấu hình qua admin API: chỉ đổi field khác null; {@code clearRetention=true} xoá retention
+   * (giữ file vĩnh viễn). Không cho đổi code/bucket/publicAccess/multipart part size.
+   */
+  public void applyAdminUpdate(
+      Boolean requireVirusScan,
+      List<String> allowedMimeTypes,
+      Long maxSizeBytes,
+      Integer retentionDays,
+      boolean clearRetention,
+      UUID actorId) {
+    if (requireVirusScan != null) {
+      this.requireVirusScan = requireVirusScan;
+    }
+    if (allowedMimeTypes != null) {
+      this.allowedMimeTypes = List.copyOf(allowedMimeTypes);
+    }
+    if (maxSizeBytes != null) {
+      this.maxSizeBytes = maxSizeBytes;
+    }
+    if (clearRetention) {
+      this.retentionDays = null;
+    } else if (retentionDays != null) {
+      this.retentionDays = retentionDays;
+    }
+    this.updatedBy = actorId;
+    this.updatedAt = Instant.now();
   }
 }
