@@ -27,6 +27,10 @@ USER appuser
 
 EXPOSE 8081
 
+# Container = JSON log ra stdout (logstash format, trường level) để Alloy -> Loki gắn label level;
+# chạy từ IDE không có biến này nên vẫn log text.
+ENV LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash
+
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
